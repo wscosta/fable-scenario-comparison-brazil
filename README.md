@@ -75,22 +75,46 @@ source("01_process_data.R")
 
 ## Shiny app — Land-use tab
 
-The app has three filter controls:
+The controls are displayed in this order:
 
 | Control | Options |
 |---------|---------|
+| **Landuse Class** | Cropland · Pasture · Forest · Other Land · Urban |
 | **Scenario** | Both · Current Trends · NDC Commitments |
 | **Years** | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
-| **Landuse Class** | Cropland · Pasture · Forest · Other Land · Urban |
+
+### Layout
+
+Each view shows an interactive chart on the left and a data panel on the right, both inside the same row.
 
 ### Chart behaviour
 
-- **Both** — single chart with all three series overlaid
-- **Current Trends / NDC Commitments** — single chart for the selected scenario
-- Historical reference line shown only when data is available for the selected class
+- **Both** — single chart with all three series overlaid (Current Trends, NDC Commitments, Historical)
+- **Current Trends / NDC Commitments** — single chart for the selected scenario + historical reference
 - Both scenarios always share the same y-axis scale for direct comparison
 - Hover over any marker to see the exact value (2 decimal places)
-- Dashed vertical line at 2020 marks the calibration / projection boundary
+- Dashed vertical line at 2020 marks the calibration / projection boundary (shown only in Calibration & Projections mode)
+
+### Data tables (right panel)
+
+The right panel always shows a **values table** with years as columns and one row per selected series (scenarios + historical). Historical values are left blank for years after 2020.
+
+When **Calibration (2000–2020)** is selected, two additional tables appear beneath the values table:
+
+| Table | Content |
+|-------|---------|
+| **Absolute Difference** | `abs(scenario − historical)` for each year, in the same unit as the chart (e.g. Mha) |
+| **Relative Difference (%)** | `(scenario − historical) / historical × 100` for each year |
+
+All values are shown with 2 decimal places. If historical data is unavailable for a given year, the difference cells are left blank.
+
+Values in the **Relative Difference** table are colour-coded by magnitude:
+
+| Range | Colour |
+|-------|--------|
+| \|val\| ≤ 10% | Green `#009C3B` |
+| 10% < \|val\| ≤ 20% | Orange `#cc6600` |
+| \|val\| > 20% | Red `#cc0000` |
 
 ### Visual encoding
 

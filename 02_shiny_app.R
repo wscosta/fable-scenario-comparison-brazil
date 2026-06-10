@@ -27,15 +27,20 @@ to_mha <- function(values, col_name, unit_override = NULL) {
 # hist_type / hist_source: matching fields in histdatabrazil.csv
 landuse_map <- list(
   "Cropland"   = list(fable_col = "CalcCropland",  fable_unit = "1000 ha",
-                      hist_type = "Cropland",                hist_source = "IBGE"),
+                      hist_type = "Cropland",                hist_source = "IBGE",
+                      y_label   = "Area (Mha)"),
   "Pasture"    = list(fable_col = "CalcPasture",   fable_unit = "1000 ha",
-                      hist_type = "Pastures and Rangelands", hist_source = "LAPIG"),
+                      hist_type = "Pastures and Rangelands", hist_source = "LAPIG",
+                      y_label   = "Area (Mha)"),
   "Forest"     = list(fable_col = "CalcForest",    fable_unit = "1000 ha",
-                      hist_type = "Forest",                  hist_source = "Mapbiomas"),
+                      hist_type = "Forest",                  hist_source = "Mapbiomas",
+                      y_label   = "Area (Mha)"),
   "Other Land" = list(fable_col = "CalcOtherLand", fable_unit = "1000 ha",
-                      hist_type = "Other Land",              hist_source = "Mapbiomas"),
+                      hist_type = "Other Land",              hist_source = "Mapbiomas",
+                      y_label   = "Area (Mha)"),
   "Urban"      = list(fable_col = "CalcUrban",     fable_unit = "1000 ha",
-                      hist_type = "Urban",                   hist_source = "Mapbiomas")
+                      hist_type = "Urban",                   hist_source = "Mapbiomas",
+                      y_label   = "Area (Mha)")
 )
 
 # Keep only classes whose FABLE column exists in the data
@@ -196,6 +201,97 @@ make_single_plot <- function(class_name, scenario_name, line_color, x_max, y_ran
               line_color, x_max = x_max, y_range = y_range)
 }
 
+# ── Table builder ─────────────────────────────────────────────────────────────
+make_table_data <- function(class_name, scenario_sel, x_max) {
+  cfg   <- landuse_map[[class_name]]
+  col   <- cfg$fable_col
+  years <- seq(2000, x_max, 5)
+  rows  <- list()
+
+  pull_scenario <- function(scen_name) {
+    raw <- df_scenarios %>%
+      filter(scenario == scen_name, Year %in% years) %>%
+      arrange(Year) %>%
+      pull(all_of(col)) %>%
+      as.numeric()
+    to_mha(raw, col, cfg$fable_unit)
+  }
+
+  if (scenario_sel %in% c("Both", "Current Trends"))
+    rows[["Current Trends"]] <- pull_scenario("Current Trends")
+
+  if (scenario_sel %in% c("Both", "NDC Commitments"))
+    rows[["NDC Commitments"]] <- pull_scenario("NDC Commitments")
+
+  hist_data <- get_hist(class_name, 2020)
+  rows[["Historical"]] <- sapply(years, function(y) {
+    if (y > 2020) return(NA_real_)
+    v <- hist_data$value[hist_data$year == y]
+    if (length(v) == 0) NA_real_ else v[1]
+  })
+
+  mat <- do.call(rbind, rows)
+  df  <- as.data.frame(mat)
+  colnames(df) <- as.character(years)
+  cbind(` ` = rownames(df), df, stringsAsFactors = FALSE)
+}
+
+# ── Difference table builder ──────────────────────────────────────────────────
+make_diff_data <- function(class_name, scenario_sel, type = "absolute") {
+  cfg   <- landuse_map[[class_name]]
+  col   <- cfg$fable_col
+  years <- seq(2000, 2020, 5)
+
+  hist_data <- get_hist(class_name, 2020)
+  hist_vals <- sapply(years, function(y) {
+    v <- hist_data$value[hist_data$year == y]
+    if (length(v) == 0) NA_real_ else v[1]
+  })
+
+  pull_scenario <- function(scen_name) {
+    raw <- df_scenarios %>%
+      filter(scenario == scen_name, Year %in% years) %>%
+      arrange(Year) %>%
+      pull(all_of(col)) %>%
+      as.numeric()
+    to_mha(raw, col, cfg$fable_unit)
+  }
+
+  rows <- list()
+  if (scenario_sel %in% c("Both", "Current Trends")) {
+    v <- pull_scenario("Current Trends")
+    rows[["Current Trends"]] <- if (type == "absolute") abs(v - hist_vals)
+                                else (v - hist_vals) / hist_vals * 100
+  }
+  if (scenario_sel %in% c("Both", "NDC Commitments")) {
+    v <- pull_scenario("NDC Commitments")
+    rows[["NDC Commitments"]] <- if (type == "absolute") abs(v - hist_vals)
+                                 else (v - hist_vals) / hist_vals * 100
+  }
+
+  mat <- do.call(rbind, rows)
+  df  <- as.data.frame(mat)
+  colnames(df) <- as.character(years)
+  cbind(` ` = rownames(df), df, stringsAsFactors = FALSE)
+}
+
+# ── Relative difference — colour text by threshold ───────────────────────────
+color_rel_val <- function(v) {
+  if (is.na(v)) return("")
+  col <- if (abs(v) <= 10) "#009C3B"        # flag green
+         else if (abs(v) <= 20) "#cc6600"   # orange
+         else "#cc0000"                     # red
+  sprintf('<span style="color:%s;font-weight:bold">%.2f</span>', col, v)
+}
+
+make_rel_diff_colored <- function(class_name, scenario_sel) {
+  df    <- make_diff_data(class_name, scenario_sel, "relative")
+  years <- names(df)[-1]
+  for (y in years)
+    df[[y]] <- vapply(as.numeric(df[[y]]), color_rel_val, character(1))
+  df
+}
+
 # ── UI ────────────────────────────────────────────────────────────────────────
 ui <- navbarPage(
   title = "FABLE Calculator — Brazil",
@@ -203,6 +299,11 @@ ui <- navbarPage(
   tabPanel("Land-use",
     br(),
     fluidRow(
+      column(3,
+        selectInput("class_sel", "Landuse Class:",
+                    choices  = names(landuse_map),
+                    selected = "Cropland")
+      ),
       column(3,
         selectInput("scenario_sel", "Scenario:",
                     choices  = c("Both", "Current Trends", "NDC Commitments"),
@@ -212,11 +313,6 @@ ui <- navbarPage(
         selectInput("years_sel", "Years:",
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections")
-      ),
-      column(3,
-        selectInput("class_sel", "Landuse Class:",
-                    choices  = names(landuse_map),
-                    selected = "Cropland")
       )
     ),
     uiOutput("charts_ui")
@@ -235,12 +331,59 @@ server <- function(input, output, session) {
   })
 
   output$charts_ui <- renderUI({
+    y_label <- landuse_map[[input$class_sel]]$y_label
+
+    right_col <- if (input$years_sel == "Calibration") {
+      tagList(
+        strong(y_label),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("data_table")),
+        strong("Absolute Difference (Mha)"),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("abs_diff_table")),
+        strong("Relative Difference (%)"),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("rel_diff_table"))
+      )
+    } else {
+      tagList(
+        strong(y_label),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("data_table"))
+      )
+    }
+
     switch(input$scenario_sel,
-      "Both"            = fluidRow(column(6, plotlyOutput("plot_both", height = "460px"))),
-      "Current Trends"  = fluidRow(column(6, plotlyOutput("plot_ct",   height = "460px"))),
-      "NDC Commitments" = fluidRow(column(6, plotlyOutput("plot_ndc",  height = "460px")))
+      "Both"            = fluidRow(
+        column(6, plotlyOutput("plot_both", height = "460px")),
+        column(6, right_col)
+      ),
+      "Current Trends"  = fluidRow(
+        column(6, plotlyOutput("plot_ct",   height = "460px")),
+        column(6, right_col)
+      ),
+      "NDC Commitments" = fluidRow(
+        column(6, plotlyOutput("plot_ndc",  height = "460px")),
+        column(6, right_col)
+      )
     )
   })
+
+  output$data_table <- renderTable(
+    make_table_data(input$class_sel, input$scenario_sel, x_max()),
+    digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+
+  output$abs_diff_table <- renderTable(
+    make_diff_data(input$class_sel, input$scenario_sel, "absolute"),
+    digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+
+  output$rel_diff_table <- renderTable(
+    make_rel_diff_colored(input$class_sel, input$scenario_sel),
+    sanitize.text.function = identity,
+    na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
 
   output$plot_both <- renderPlotly({
     make_combined_plot(input$class_sel, x_max(), y_range())
