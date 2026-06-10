@@ -1,8 +1,8 @@
-# FABLE Calculator — Scenario Comparison (Brazil)
+# 🌿 FABLE Calculator — Scenario Comparison (Brazil)
 
 An interactive R Shiny app to compare two [FABLE Calculator](https://fableconsortium.org/tools/fablecalculators/) land-use scenarios for Brazil against observed historical data.
 
-## Overview
+## 📋 Overview
 
 The FABLE Calculator is a spreadsheet-based land-use modelling tool developed by the FABLE Consortium to explore national pathways toward sustainable food and land-use systems. This project reads two Brazil-specific scenario files and overlays their outputs with historical reference data (2000–2020), enabling visual comparison across land-use classes and time periods.
 
@@ -11,7 +11,7 @@ The FABLE Calculator is a spreadsheet-based land-use modelling tool developed by
 | **Current Trends** | Business-as-usual trajectory |
 | **NDC Commitments** | Nationally Determined Contribution targets |
 
-## Repository structure
+## 📁 Repository structure
 
 ```
 fable-scenario-comparison-brazil/
@@ -28,7 +28,7 @@ fable-scenario-comparison-brazil/
 └── README.md
 ```
 
-## Data sources
+## 🗄️ Data sources
 
 ### Historical data (`histdatabrazil.csv`)
 
@@ -45,13 +45,13 @@ Long-format CSV with columns `type`, `source`, `year`, `value`, `unit`. Coverage
 
 Read from the `SCENATHON_report` sheet (column headers at row 11, `skip = 10`). Each row is a 5-year time step from 2000 to 2050.
 
-## Requirements
+## ⚙️ Requirements
 
 ```r
 install.packages(c("readxl", "dplyr", "tidyr", "shiny", "plotly"))
 ```
 
-## Usage
+## 🚀 Usage
 
 **Terminal (one command)**
 
@@ -73,7 +73,7 @@ To force a full re-read of the source files:
 source("01_process_data.R")
 ```
 
-## Shiny app — Land-use tab
+## 📊 Shiny app — Land-use tab
 
 The controls are displayed in this order:
 
