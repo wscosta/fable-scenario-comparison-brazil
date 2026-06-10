@@ -1,0 +1,12 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj.user
+
+# Generated data (reproduced by 01_process_data.R)
+data/processed/
+
+# OS
+.DS_Store
+Thumbs.db

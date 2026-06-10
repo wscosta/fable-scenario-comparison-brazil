@@ -1,0 +1,223 @@
+type,source,year ,value,unit
+Pastures and Rangelands,LAPIG,1995,152.77,million ha
+Pastures and Rangelands,LAPIG,2000,168.32,million ha
+Pastures and Rangelands,LAPIG,2005,177.17,million ha
+Pastures and Rangelands,LAPIG,2010,179.22,million ha
+Pastures and Rangelands,LAPIG,2015,178.17,million ha
+Pastures and Rangelands,LAPIG,2020,177.24,million ha
+Forest,Mapbiomas,1995,568.0288629,million ha
+Forest,Mapbiomas,2000,552.0090547,million ha
+Forest,Mapbiomas,2005,535.2429602,million ha
+Forest,Mapbiomas,2010,527.4954576,million ha
+Forest,Mapbiomas,2015,521.4796658,million ha
+Forest,Mapbiomas,2020,513.1801345,million ha
+Ruminant Meat,FAOSTAT,1995,5.8445,million tonnes
+Ruminant Meat,FAOSTAT,2000,6.6796,million tonnes
+Ruminant Meat,FAOSTAT,2005,8.6974,million tonnes
+Ruminant Meat,FAOSTAT,2010,9.2263,million tonnes
+Ruminant Meat,FAOSTAT,2015,9.54650909,million tonnes
+Ruminant Meat,FAOSTAT,2020,10.11590392,million tonnes
+Other Land,Mapbiomas,1995,51.19588857,million ha
+Other Land,Mapbiomas,2000,51.6150562,million ha
+Other Land,Mapbiomas,2005,50.79746883,million ha
+Other Land,Mapbiomas,2010,49.93474128,million ha
+Other Land,Mapbiomas,2015,49.21532897,million ha
+Other Land,Mapbiomas,2020,48.65974572,million ha
+Cropland,IBGE,1995,51.85,million ha
+Cropland,IBGE,2000,51.82,million ha
+Cropland,IBGE,2005,64.32,million ha
+Cropland,IBGE,2010,65.38,million ha
+Cropland,IBGE,2015,76.95,million ha
+Cropland,IBGE,2020,83.38,million ha
+Permanent Crops,IBGE,1995,5.708548,million ha
+Permanent Crops,IBGE,2000,6.17517,million ha
+Permanent Crops,IBGE,2005,6.25227,million ha
+Permanent Crops,IBGE,2010,6.218204,million ha
+Permanent Crops,IBGE,2015,5.845102,million ha
+Permanent Crops,IBGE,2020,5.405637,million ha
+Soybean Area,IBGE,1995,11.70,million ha
+Soybean Area,IBGE,2000,13.69,million ha
+Soybean Area,IBGE,2005,23.43,million ha
+Soybean Area,IBGE,2010,23.34,million ha
+Soybean Area,IBGE,2015,32.21,million ha
+Soybean Area,IBGE,2020,37.20,million ha
+Maize Area,IBGE,1995,14.18,million ha
+Maize Area,IBGE,2000,12.65,million ha
+Maize Area,IBGE,2005,12.25,million ha
+Maize Area,IBGE,2010,12.96,million ha
+Maize Area,IBGE,2015,15.85,million ha
+Maize Area,IBGE,2020,18.36,million ha
+Sugarcane Area,IBGE,1995,4.64,million ha
+Sugarcane Area,IBGE,2000,4.88,million ha
+Sugarcane Area,IBGE,2005,5.82,million ha
+Sugarcane Area,IBGE,2010,9.16,million ha
+Sugarcane Area,IBGE,2015,10.18,million ha
+Sugarcane Area,IBGE,2020,10,million ha
+Soybean Production,IBGE,1995,25.68,million tonnes
+Soybean Production,IBGE,2000,32.82,million tonnes
+Soybean Production,IBGE,2005,51.18,million tonnes
+Soybean Production,IBGE,2010,68.76,million tonnes
+Soybean Production,IBGE,2015,97.46,million tonnes
+Soybean Production,IBGE,2020,121.82,million tonnes
+Maize Production,IBGE,1995,36.27,million tonnes
+Maize Production,IBGE,2000,32.32,million tonnes
+Maize Production,IBGE,2005,35.11,million tonnes
+Maize Production,IBGE,2010,55.36,million tonnes
+Maize Production,IBGE,2015,85.28,million tonnes
+Maize Production,IBGE,2020,103.99,million tonnes
+Sugarcane Production,IBGE,1995,303.7,million tonnes
+Sugarcane Production,IBGE,2000,326.12,million tonnes
+Sugarcane Production,IBGE,2005,422.96,million tonnes
+Sugarcane Production,IBGE,2010,717.46,million tonnes
+Sugarcane Production,IBGE,2015,750.29,million tonnes
+Sugarcane Production,IBGE,2020,756.07,million tonnes
+CO2 AFOLU,SEEG13,1995,1758.41384670148,million tonnes
+CO2 AFOLU,SEEG13,2000,1478.24504897341,million tonnes
+CO2 AFOLU,SEEG13,2005,1390.64764383952,million tonnes
+CO2 AFOLU,SEEG13,2010,336.0623395283,million tonnes
+CO2 AFOLU,SEEG13,2015,335.923980951867,million tonnes
+CO2 AFOLU,SEEG13,2020,553.786333036006,million tonnes
+N2O AFOLU,SEEG13,1995,0.396629912819069,million tonnes
+N2O AFOLU,SEEG13,2000,0.425559059343469,million tonnes
+N2O AFOLU,SEEG13,2005,0.507340674485336,million tonnes
+N2O AFOLU,SEEG13,2010,0.507195535532445,million tonnes
+N2O AFOLU,SEEG13,2015,0.558539145603383,million tonnes
+N2O AFOLU,SEEG13,2020,0.612252894683371,million tonnes
+CH4 AFOLU,SEEG13,1995,14.1390786820501,million tonnes
+CH4 AFOLU,SEEG13,2000,14.5218728893085,million tonnes
+CH4 AFOLU,SEEG13,2005,16.3090179449675,million tonnes
+CH4 AFOLU,SEEG13,2010,15.160680487479,million tonnes
+CH4 AFOLU,SEEG13,2015,15.5417114997082,million tonnes
+CH4 AFOLU,SEEG13,2020,16.3985784958362,million tonnes
+CH4 Rice,SEEG13,1995,0.383931697506861,million tonnes
+CH4 Rice,SEEG13,2000,0.365724813847781,million tonnes
+CH4 Rice,SEEG13,2005,0.378487960159939,million tonnes
+CH4 Rice,SEEG13,2010,0.401424104808713,million tonnes
+CH4 Rice,SEEG13,2015,0.406326876911255,million tonnes
+CH4 Rice,SEEG13,2020,0.379728312939846,million tonnes
+CH4 Enteric Fermentation,SEEG13,1995,10.685888596954,million tonnes
+CH4 Enteric Fermentation,SEEG13,2000,11.225785784962,million tonnes
+CH4 Enteric Fermentation,SEEG13,2005,12.820996953602,million tonnes
+CH4 Enteric Fermentation,SEEG13,2010,12.8630278042738,million tonnes
+CH4 Enteric Fermentation,SEEG13,2015,13.0984813239295,million tonnes
+CH4 Enteric Fermentation,SEEG13,2020,13.4712340109816,million tonnes
+CH4 Animal Waste Management,SEEG13,1995,0.559575091176399,million tonnes
+CH4 Animal Waste Management,SEEG13,2000,0.571772015335798,million tonnes
+CH4 Animal Waste Management,SEEG13,2005,0.656402286228085,million tonnes
+CH4 Animal Waste Management,SEEG13,2010,0.728628408660588,million tonnes
+CH4 Animal Waste Management,SEEG13,2015,0.809617618205628,million tonnes
+CH4 Animal Waste Management,SEEG13,2020,0.856648998661053,million tonnes
+CH4 Burning of Crop Residues,SEEG13,1995,0.0403521978129028,million tonnes
+CH4 Burning of Crop Residues,SEEG13,2000,0.0406193374378739,million tonnes
+CH4 Burning of Crop Residues,SEEG13,2005,0.0507388357712961,million tonnes
+CH4 Burning of Crop Residues,SEEG13,2010,0.0422037941601928,million tonnes
+CH4 Burning of Crop Residues,SEEG13,2015,0.0168013570178731,million tonnes
+CH4 Burning of Crop Residues,SEEG13,2020,0.00894873271429952,million tonnes
+N2O Animal Waste Management,SEEG13,1995,0.00781579090000962,million tonnes
+N2O Animal Waste Management,SEEG13,2000,0.00807969273216056,million tonnes
+N2O Animal Waste Management,SEEG13,2005,0.00908452466113759,million tonnes
+N2O Animal Waste Management,SEEG13,2010,0.0111001585648835,million tonnes
+N2O Animal Waste Management,SEEG13,2015,0.0123565973585109,million tonnes
+N2O Animal Waste Management,SEEG13,2020,0.0136121085040346,million tonnes
+N2O Burning of Crop Residues,SEEG13,1995,0.00301346419135719,million tonnes
+N2O Burning of Crop Residues,SEEG13,2000,0.0030475387145243,million tonnes
+N2O Burning of Crop Residues,SEEG13,2005,0.00380677224436305,million tonnes
+N2O Burning of Crop Residues,SEEG13,2010,0.00316641542466613,million tonnes
+N2O Burning of Crop Residues,SEEG13,2015,0.00126055197347387,million tonnes
+N2O Burning of Crop Residues,SEEG13,2020,0.000671394737407252,million tonnes
+N2O Decay of Crop Residues,SEEG13,1995,0.0593066337219414,million tonnes
+N2O Decay of Crop Residues,SEEG13,2000,0.0668665800204054,million tonnes
+N2O Decay of Crop Residues,SEEG13,2005,0.086582128418038,million tonnes
+N2O Decay of Crop Residues,SEEG13,2010,0.102911687594316,million tonnes
+N2O Decay of Crop Residues,SEEG13,2015,0.123677741804404,million tonnes
+N2O Decay of Crop Residues,SEEG13,2020,0.139034591673268,million tonnes
+N2O Inorganic Fertilizers,SEEG13,1995,0.0250907624665568,million tonnes
+N2O Inorganic Fertilizers,SEEG13,2000,0.0343928270222856,million tonnes
+N2O Inorganic Fertilizers,SEEG13,2005,0.0509286640203529,million tonnes
+N2O Inorganic Fertilizers,SEEG13,2010,0.0637239926636912,million tonnes
+N2O Inorganic Fertilizers,SEEG13,2015,0.0865547422518797,million tonnes
+N2O Inorganic Fertilizers,SEEG13,2020,0.110775198720641,million tonnes
+N2O Manure Applied to Croplands,SEEG13,1995,0.0130246092429858,million tonnes
+N2O Manure Applied to Croplands,SEEG13,2000,0.0140117881778286,million tonnes
+N2O Manure Applied to Croplands,SEEG13,2005,0.01709585321913,million tonnes
+N2O Manure Applied to Croplands,SEEG13,2010,0.0215484397113124,million tonnes
+N2O Manure Applied to Croplands,SEEG13,2015,0.022719792189006,million tonnes
+N2O Manure Applied to Croplands,SEEG13,2020,0.0238490218457679,million tonnes
+N2O Pasture,SEEG13,1995,0.185521857574833,million tonnes
+N2O Pasture,SEEG13,2000,0.194233188494806,million tonnes
+N2O Pasture,SEEG13,2005,0.225514388900087,million tonnes
+N2O Pasture,SEEG13,2010,0.231710025329683,million tonnes
+N2O Pasture,SEEG13,2015,0.233944616962374,million tonnes
+N2O Pasture,SEEG13,2020,0.233965334141176,million tonnes
+N2O Peatland,SEEG13,1995,0.00556199999999999,million tonnes
+N2O Peatland,SEEG13,2000,0.00582199999999999,million tonnes
+N2O Peatland,SEEG13,2005,0.00597800001178321,million tonnes
+N2O Peatland,SEEG13,2010,0.00614400002920188,million tonnes
+N2O Peatland,SEEG13,2015,0.0063504003290256,million tonnes
+N2O Peatland,SEEG13,2020,0.00653280500230256,million tonnes
+N2O Soil Organic Matter Loss,SEEG13,1995,0.00508011461578962,million tonnes
+N2O Soil Organic Matter Loss,SEEG13,2000,0.00508011461578962,million tonnes
+N2O Soil Organic Matter Loss,SEEG13,2005,0.011136752197227,million tonnes
+N2O Soil Organic Matter Loss,SEEG13,2010,0.0105931758362881,million tonnes
+N2O Soil Organic Matter Loss,SEEG13,2015,0.0101071819329255,million tonnes
+N2O Soil Organic Matter Loss,SEEG13,2020,0.0101071819329255,million tonnes
+Agriculture,IBGE + LAPIG,1995,204.438819,million ha
+Agriculture,IBGE + LAPIG,2000,220.068924,million ha
+Agriculture,IBGE + LAPIG,2005,241.386479,million ha
+Agriculture,IBGE + LAPIG,2010,244.497803,million ha
+Agriculture,IBGE + LAPIG,2015,255.046406,million ha
+Agriculture,IBGE + LAPIG,2020,260.601574,million ha
+Forest Products,IBGE,1995,35.51283482,Mt DM/yr
+Forest Products,IBGE,2000,40.98537764,Mt DM/yr
+Forest Products,IBGE,2005,49.47647538,Mt DM/yr
+Forest Products,IBGE,2010,59.83182646,Mt DM/yr
+Forest Products,IBGE,2015,66.32380224,Mt DM/yr
+Forest Products,IBGE,2020,72.25398086,Mt DM/yr
+Industrial Roundwood,IBGE,1995,23.8652295,Mt DM/yr
+Industrial Roundwood,IBGE,2000,25.10112885,Mt DM/yr
+Industrial Roundwood,IBGE,2005,35.21512505,Mt DM/yr
+Industrial Roundwood,IBGE,2010,40.50953585,Mt DM/yr
+Industrial Roundwood,IBGE,2015,43.3539652,Mt DM/yr
+Industrial Roundwood,IBGE,2020,50.16919075,Mt DM/yr
+Wood Fuel,IBGE,1995,11.64760532,Mt DM/yr
+Wood Fuel,IBGE,2000,15.88424879,Mt DM/yr
+Wood Fuel,IBGE,2005,14.26135033,Mt DM/yr
+Wood Fuel,IBGE,2010,19.32229061,Mt DM/yr
+Wood Fuel,IBGE,2015,22.96983704,Mt DM/yr
+Wood Fuel,IBGE,2020,22.08479011,Mt DM/yr
+Cropland,FAOSTAT_Production,1995,51.769084,million ha
+Cropland,FAOSTAT_Production,2000,51.215334,million ha
+Cropland,FAOSTAT_Production,2005,63.68705,million ha
+Cropland,FAOSTAT_Production,2010,65.66651,million ha
+Cropland,FAOSTAT_Production,2015,76.973441,million ha
+Cropland,FAOSTAT_Production,2020,84.055137,million ha
+Forest,FAOSTAT,1995,569.9933,million ha
+Forest,FAOSTAT,2000,551.0886,million ha
+Forest,FAOSTAT,2005,531.33465,million ha
+Forest,FAOSTAT,2010,511.5807,million ha
+Forest,FAOSTAT,2015,503.8848,million ha
+Forest,FAOSTAT,2020,496.6196,million ha
+Cropland,FAOSTAT_Landuse,1995,50.105,million ha
+Cropland,FAOSTAT_Landuse,2000,54.87,million ha
+Cropland,FAOSTAT_Landuse,2005,59.635,million ha
+Cropland,FAOSTAT_Landuse,2010,61.657,million ha
+Cropland,FAOSTAT_Landuse,2015,62.987,million ha
+Cropland,FAOSTAT_Landuse,2020,63.4458462,million ha
+Temporary Crops,IBGE,1995,45.960271,million ha
+Temporary Crops,IBGE,2000,45.573754,million ha
+Temporary Crops,IBGE,2005,57.964209,million ha
+Temporary Crops,IBGE,2010,59.059599,million ha
+Temporary Crops,IBGE,2015,71.031304,million ha
+Temporary Crops,IBGE,2020,77.955937,million ha
+Urban,Mapbiomas,1995,2.4790635,million ha
+Urban,Mapbiomas,2000,2.835137505,million ha
+Urban,Mapbiomas,2005,3.096471437,million ha
+Urban,Mapbiomas,2010,3.359244846,million ha
+Urban,Mapbiomas,2015,3.690668126,million ha
+Urban,Mapbiomas,2020,3.974328791,million ha
+Secondary Forest,Mapbiomas,1995,13.919462,million ha
+Secondary Forest,Mapbiomas,2000,19.256821,million ha
+Secondary Forest,Mapbiomas,2005,24.477493,million ha
+Secondary Forest,Mapbiomas,2010,29.467018,million ha
+Secondary Forest,Mapbiomas,2015,33.559351,million ha
+Secondary Forest,Mapbiomas,2020,37.354036,million ha
