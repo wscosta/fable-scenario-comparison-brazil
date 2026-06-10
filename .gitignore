@@ -7,6 +7,9 @@
 # Generated data (reproduced by 01_process_data.R)
 data/processed/
 
+# Claude Code
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
