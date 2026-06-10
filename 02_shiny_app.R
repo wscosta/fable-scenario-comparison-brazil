@@ -71,14 +71,17 @@ COL_CT   <- "#1565C0"
 COL_NDC  <- "#009C3B"
 
 # ── Shared layout helper ──────────────────────────────────────────────────────
-base_layout <- function(p, title_text, title_color = "black", x_max, y_range) {
+base_layout <- function(p, title_text, title_color = "black", x_max, y_range, barmode = NULL) {
+  is_bar  <- !is.null(barmode)
+  x_range <- if (is_bar) c(1996, x_max + 4) else c(1999, x_max + 1)
+
   shapes <- list(
     list(type = "rect",
          xref = "paper", yref = "paper", x0 = 0, x1 = 1, y0 = 0, y1 = 1,
          line = list(color = "black", width = 1),
          fillcolor = "rgba(0,0,0,0)")
   )
-  if (x_max > 2020) {
+  if (x_max > 2020 && !is_bar) {
     shapes <- c(
       list(list(type = "line",
                 x0 = 2020, x1 = 2020, yref = "paper", y0 = 0, y1 = 1,
@@ -94,7 +97,7 @@ base_layout <- function(p, title_text, title_color = "black", x_max, y_range) {
       title     = "",
       tickvals  = seq(2000, x_max, 5),
       tickangle = 0,
-      range     = c(1999, x_max + 1),
+      range     = x_range,
       ticks     = "outside", ticklen = 6, tickcolor = "white",
       gridcolor = "#CCCCCC"
     ),
@@ -108,6 +111,9 @@ base_layout <- function(p, title_text, title_color = "black", x_max, y_range) {
                   bgcolor = "white", bordercolor = "black", borderwidth = 1),
     margin        = list(l = 70, r = 160, t = 50, b = 50),
     shapes        = shapes,
+    barmode       = barmode,
+    bargap        = if (is_bar) 0.5  else NULL,
+    bargroupgap   = if (is_bar) 0.15 else NULL,
     plot_bgcolor  = "white",
     paper_bgcolor = "white"
   )
@@ -129,19 +135,27 @@ calc_y_range <- function(class_name, x_max) {
 }
 
 # ── Plot builders ─────────────────────────────────────────────────────────────
-add_hist_trace <- function(p, hist_data, source_label) {
+add_hist_trace <- function(p, hist_data, source_label, chart_type = "Line chart") {
   if (nrow(hist_data) == 0) return(p)
   trace_name <- paste0("Historical (", source_label, ")")
-  add_trace(p, data = hist_data, x = ~year, y = ~value,
-            type = "scatter", mode = "lines+markers",
-            name = trace_name,
-            line   = list(color = COL_HIST, width = 2),
-            marker = list(color = COL_HIST, size = 7),
-            hovertemplate = paste0("%{x}: <b>%{y:.2f} Mha</b><extra>",
-                                   trace_name, "</extra>"))
+  hover <- paste0("%{x}: <b>%{y:.2f} Mha</b><extra>", trace_name, "</extra>")
+  if (chart_type == "Bar chart") {
+    add_trace(p, data = hist_data, x = ~year, y = ~value,
+              type = "bar", name = trace_name,
+              marker = list(color = "#1a1a1a",
+                            line  = list(color = "black", width = 1)),
+              hovertemplate = hover)
+  } else {
+    add_trace(p, data = hist_data, x = ~year, y = ~value,
+              type = "scatter", mode = "lines+markers",
+              name = trace_name,
+              line   = list(color = COL_HIST, width = 2),
+              marker = list(color = COL_HIST, size = 7),
+              hovertemplate = hover)
+  }
 }
 
-make_combined_plot <- function(class_name, x_max, y_range) {
+make_combined_plot <- function(class_name, x_max, y_range, chart_type = "Line chart") {
   col  <- landuse_map[[class_name]]$fable_col
 
   ct <- df_scenarios %>%
@@ -157,26 +171,43 @@ make_combined_plot <- function(class_name, x_max, y_range) {
   hist_data    <- get_hist(class_name, x_max)
   source_label <- landuse_map[[class_name]]$hist_source
 
-  p <- plot_ly() %>%
-    add_trace(data = ct, x = ~year, y = ~value,
-              type = "scatter", mode = "lines+markers",
-              name = "Current Trends",
-              line   = list(color = COL_CT, width = 2),
-              marker = list(color = COL_CT, size = 7),
-              hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>Current Trends</extra>") %>%
-    add_trace(data = ndc, x = ~year, y = ~value,
-              type = "scatter", mode = "lines+markers",
-              name = "NDC Commitments",
-              line   = list(color = COL_NDC, width = 2),
-              marker = list(color = COL_NDC, size = 7),
-              hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>NDC Commitments</extra>") %>%
-    add_hist_trace(hist_data, source_label)
+  if (chart_type == "Bar chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct, x = ~year, y = ~value,
+                type = "bar", name = "Current Trends",
+                marker = list(color = COL_CT,
+                              line  = list(color = "black", width = 1)),
+                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>Current Trends</extra>") %>%
+      add_trace(data = ndc, x = ~year, y = ~value,
+                type = "bar", name = "NDC Commitments",
+                marker = list(color = COL_NDC,
+                              line  = list(color = "black", width = 1)),
+                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>NDC Commitments</extra>") %>%
+      add_hist_trace(hist_data, source_label, chart_type)
+  } else {
+    p <- plot_ly() %>%
+      add_trace(data = ct, x = ~year, y = ~value,
+                type = "scatter", mode = "lines+markers",
+                name = "Current Trends",
+                line   = list(color = COL_CT, width = 2),
+                marker = list(color = COL_CT, size = 7),
+                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>Current Trends</extra>") %>%
+      add_trace(data = ndc, x = ~year, y = ~value,
+                type = "scatter", mode = "lines+markers",
+                name = "NDC Commitments",
+                line   = list(color = COL_NDC, width = 2),
+                marker = list(color = COL_NDC, size = 7),
+                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>NDC Commitments</extra>") %>%
+      add_hist_trace(hist_data, source_label, chart_type)
+  }
 
   base_layout(p, paste0(class_name, ": Current Trends vs NDC Commitments"),
-              x_max = x_max, y_range = y_range)
+              x_max = x_max, y_range = y_range,
+              barmode = if (chart_type == "Bar chart") "group" else NULL)
 }
 
-make_single_plot <- function(class_name, scenario_name, line_color, x_max, y_range) {
+make_single_plot <- function(class_name, scenario_name, bar_color, x_max, y_range,
+                             chart_type = "Line chart") {
   col  <- landuse_map[[class_name]]$fable_col
 
   scen <- df_scenarios %>%
@@ -186,19 +217,30 @@ make_single_plot <- function(class_name, scenario_name, line_color, x_max, y_ran
 
   hist_data    <- get_hist(class_name, x_max)
   source_label <- landuse_map[[class_name]]$hist_source
+  hover        <- paste0("%{x}: <b>%{y:.2f} Mha</b><extra>", scenario_name, "</extra>")
 
-  p <- plot_ly() %>%
-    add_trace(data = scen, x = ~year, y = ~value,
-              type = "scatter", mode = "lines+markers",
-              name = scenario_name,
-              line   = list(color = line_color, width = 2),
-              marker = list(color = line_color, size = 7),
-              hovertemplate = paste0("%{x}: <b>%{y:.2f} Mha</b><extra>",
-                                     scenario_name, "</extra>")) %>%
-    add_hist_trace(hist_data, source_label)
+  if (chart_type == "Bar chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value,
+                type = "bar", name = scenario_name,
+                marker = list(color = bar_color,
+                              line  = list(color = "black", width = 1)),
+                hovertemplate = hover) %>%
+      add_hist_trace(hist_data, source_label, chart_type)
+  } else {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value,
+                type = "scatter", mode = "lines+markers",
+                name = scenario_name,
+                line   = list(color = bar_color, width = 2),
+                marker = list(color = bar_color, size = 7),
+                hovertemplate = hover) %>%
+      add_hist_trace(hist_data, source_label, chart_type)
+  }
 
   base_layout(p, paste0(class_name, ": ", scenario_name),
-              line_color, x_max = x_max, y_range = y_range)
+              bar_color, x_max = x_max, y_range = y_range,
+              barmode = if (chart_type == "Bar chart") "group" else NULL)
 }
 
 # ── Table builder ─────────────────────────────────────────────────────────────
@@ -313,6 +355,11 @@ ui <- navbarPage(
         selectInput("years_sel", "Years:",
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections")
+      ),
+      column(3,
+        selectInput("chart_type", "Chart type:",
+                    choices  = c("Line chart", "Bar chart"),
+                    selected = "Line chart")
       )
     ),
     uiOutput("charts_ui")
@@ -386,13 +433,13 @@ server <- function(input, output, session) {
   )
 
   output$plot_both <- renderPlotly({
-    make_combined_plot(input$class_sel, x_max(), y_range())
+    make_combined_plot(input$class_sel, x_max(), y_range(), input$chart_type)
   })
   output$plot_ct <- renderPlotly({
-    make_single_plot(input$class_sel, "Current Trends",  COL_CT,  x_max(), y_range())
+    make_single_plot(input$class_sel, "Current Trends",  COL_CT,  x_max(), y_range(), input$chart_type)
   })
   output$plot_ndc <- renderPlotly({
-    make_single_plot(input$class_sel, "NDC Commitments", COL_NDC, x_max(), y_range())
+    make_single_plot(input$class_sel, "NDC Commitments", COL_NDC, x_max(), y_range(), input$chart_type)
   })
 }
 

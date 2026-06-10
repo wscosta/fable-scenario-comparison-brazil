@@ -82,6 +82,7 @@ The controls are displayed in this order:
 | **Landuse Class** | Cropland · Pasture · Forest · Other Land · Urban |
 | **Scenario** | Both · Current Trends · NDC Commitments |
 | **Years** | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
+| **Chart type** | Line chart · Bar chart |
 
 ### Layout
 
@@ -92,8 +93,18 @@ Each view shows an interactive chart on the left and a data panel on the right, 
 - **Both** — single chart with all three series overlaid (Current Trends, NDC Commitments, Historical)
 - **Current Trends / NDC Commitments** — single chart for the selected scenario + historical reference
 - Both scenarios always share the same y-axis scale for direct comparison
-- Hover over any marker to see the exact value (2 decimal places)
-- Dashed vertical line at 2020 marks the calibration / projection boundary (shown only in Calibration & Projections mode)
+- Hover over any point or bar to see the exact value (2 decimal places)
+- Dashed vertical line at 2020 marks the calibration / projection boundary (line chart only, Calibration & Projections mode)
+
+### Bar chart
+
+When **Bar chart** is selected, bars are grouped by year with the same colour scheme as the line chart:
+
+| Series | Fill | Border |
+|--------|------|--------|
+| Current Trends | Blue `#1565C0` | Black |
+| NDC Commitments | Green `#009C3B` | Black |
+| Historical | Near-black `#1a1a1a` | Black |
 
 ### Data tables (right panel)
 
@@ -116,7 +127,7 @@ Values in the **Relative Difference** table are colour-coded by magnitude:
 | 10% < \|val\| ≤ 20% | <font color="#cc6600">**Orange**</font> |
 | \|val\| > 20% | <font color="#cc0000">**Red**</font> |
 
-### Visual encoding
+### Visual encoding (line chart)
 
 | Series | Colour |
 |--------|--------|
