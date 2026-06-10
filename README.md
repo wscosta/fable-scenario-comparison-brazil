@@ -112,18 +112,14 @@ Values in the **Relative Difference** table are colour-coded by magnitude:
 
 | Range | Colour |
 |-------|--------|
-| \|val\| ≤ 10% | Green `#009C3B` |
-| 10% < \|val\| ≤ 20% | Orange `#cc6600` |
-| \|val\| > 20% | Red `#cc0000` |
+| \|val\| ≤ 10% | <font color="#009C3B">**Green**</font> |
+| 10% < \|val\| ≤ 20% | <font color="#cc6600">**Orange**</font> |
+| \|val\| > 20% | <font color="#cc0000">**Red**</font> |
 
 ### Visual encoding
 
 | Series | Colour |
 |--------|--------|
 | Current Trends | Blue `#1565C0` |
-| NDC Commitments | Green `#009C3B` (Brazilian flag) |
+| NDC Commitments | Green `#009C3B` |
 | Historical | Black `#000000` |
-
-## License
-
-To be defined.
