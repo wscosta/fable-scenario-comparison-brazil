@@ -41,6 +41,29 @@ print(names(df_ct))
 
 df_scenarios <- bind_rows(df_ct, df_ndc)
 
+# ── Read crop table (second table in SCENATHON_report, header at row 29) ──────
+# Columns used: B=Product, C=Year, G=ProdQ_feas, H=FeasHarvarea
+read_crop_table <- function(path, scenario_label) {
+  raw        <- read_excel(path, sheet = "SCENATHON_report", skip = 28)
+  names(raw) <- trimws(names(raw))
+  raw %>%
+    filter(!is.na(Product), !is.na(Year)) %>%
+    mutate(Year     = suppressWarnings(as.integer(Year)),
+           scenario = scenario_label) %>%
+    filter(!is.na(Year), Year >= 2000, Year <= 2050) %>%
+    mutate(ProdQ_feas   = as.numeric(ProdQ_feas),
+           FeasHarvarea = as.numeric(FeasHarvarea)) %>%
+    select(scenario, Product, Year, ProdQ_feas, FeasHarvarea)
+}
+
+df_crops <- bind_rows(
+  read_crop_table(path_ct,  "Current Trends"),
+  read_crop_table(path_ndc, "NDC Commitments")
+)
+
+message("── Crop products found ───────────────────────────────────────")
+print(sort(unique(df_crops$Product)))
+
 # ── Read historical data ──────────────────────────────────────────────────────
 df_hist <- read.csv(path_hist, check.names = FALSE, stringsAsFactors = FALSE)
 colnames(df_hist) <- trimws(colnames(df_hist))
@@ -56,4 +79,5 @@ dir.create("data/processed", showWarnings = FALSE, recursive = TRUE)
 saveRDS(df_scenarios, "data/processed/df_scenarios.rds")
 saveRDS(df_hist,      "data/processed/df_hist.rds")
 saveRDS(fable_units,  "data/processed/fable_units.rds")
-message("Saved: df_scenarios.rds, df_hist.rds, fable_units.rds")
+saveRDS(df_crops,     "data/processed/df_crops.rds")
+message("Saved: df_scenarios.rds, df_hist.rds, fable_units.rds, df_crops.rds")

@@ -43,7 +43,10 @@ Long-format CSV with columns `type`, `source`, `year`, `value`, `unit`. Coverage
 
 ### Scenario data (`xlsx/`)
 
-Read from the `SCENATHON_report` sheet (column headers at row 11, `skip = 10`). Each row is a 5-year time step from 2000 to 2050.
+Two tables are read from the `SCENATHON_report` sheet:
+
+- **Aggregate table** (header row 11, `skip = 10`) — one row per 5-year time step (2000–2050), wide format with land-use, emissions and other aggregate variables.
+- **Crop table** (header row 29, `skip = 28`) — long format with columns `Product`, `Year`, `ProdQ_feas` (production, 1000 t) and `FeasHarvarea` (harvested area, 1000 ha), one row per product per year.
 
 ## ⚙️ Requirements
 
@@ -134,3 +137,23 @@ Values in the **Relative Difference** table are colour-coded by magnitude:
 | Current Trends | Blue `#1565C0` |
 | NDC Commitments | Green `#009C3B` |
 | Historical | Black `#000000` |
+
+## 🌾 Shiny app — Crops tab
+
+| Control | Options |
+|---------|---------|
+| **Crop** | Soybeans · Corn · Sugarcane |
+| **Type** | Area · Production · Yield |
+| **Scenario** | Both · Current Trends · NDC Commitments |
+| **Years** | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
+| **Chart type** | Line chart · Bar chart |
+
+### Metrics
+
+| Type | Source | Unit | Notes |
+|------|--------|------|-------|
+| Area | `FeasHarvarea` (FABLE crop table) | Mha | Converted from 1 000 ha |
+| Production | `ProdQ_feas` (FABLE crop table) | Mt | Converted from 1 000 t |
+| Yield | Derived | t/ha | Production (Mt) ÷ Area (Mha) |
+
+Historical reference comes from `histdatabrazil.csv` (IBGE). Layout, chart behaviour, data tables and colour encoding are identical to the Land-use tab, with the y-axis label updating per metric (Area (Mha) · Production (Mt) · Yield (t/ha)).
