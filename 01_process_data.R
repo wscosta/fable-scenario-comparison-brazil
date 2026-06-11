@@ -51,9 +51,11 @@ read_crop_table <- function(path, scenario_label) {
     mutate(Year     = suppressWarnings(as.integer(Year)),
            scenario = scenario_label) %>%
     filter(!is.na(Year), Year >= 2000, Year <= 2050) %>%
-    mutate(ProdQ_feas   = as.numeric(ProdQ_feas),
-           FeasHarvarea = as.numeric(FeasHarvarea)) %>%
-    select(scenario, Product, Year, ProdQ_feas, FeasHarvarea)
+    mutate(ProdQ_feas        = as.numeric(ProdQ_feas),
+           FeasHarvarea      = as.numeric(FeasHarvarea),
+           Export_quantity   = as.numeric(Export_quantity),
+           Import_quantity   = as.numeric(Import_quantity)) %>%
+    select(scenario, Product, Year, ProdQ_feas, FeasHarvarea, Export_quantity, Import_quantity)
 }
 
 df_crops <- bind_rows(

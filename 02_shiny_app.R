@@ -734,6 +734,118 @@ make_live_rel_diff_colored <- function(product, scenario_sel) {
   df
 }
 
+# ── Trade configuration ───────────────────────────────────────────────────────
+# Data from df_crops: Export_quantity / Import_quantity, both in 1000 t → Mt.
+# No historical series — values table only, no diff tables.
+trade_map <- list(
+  "Exports" = list(
+    fable_col = "Export_quantity",
+    unit      = "1000 t",
+    products  = c("Soybeans", "Corn", "Beef"),
+    fable_product = list("Soybeans" = "soyabean", "Corn" = "corn", "Beef" = "beef")
+  ),
+  "Imports" = list(
+    fable_col = "Import_quantity",
+    unit      = "1000 t",
+    products  = c("Wheat"),
+    fable_product = list("Wheat" = "wheat")
+  )
+)
+
+get_trade_fable <- function(trade_type, product, scenario_name, x_max) {
+  cfg  <- trade_map[[trade_type]]
+  col  <- cfg$fable_col
+  prod <- cfg$fable_product[[product]]
+  rows <- df_crops %>%
+    filter(scenario == scenario_name,
+           trimws(Product) == prod,
+           Year <= x_max) %>%
+    arrange(Year)
+  tibble(year = rows$Year, value = to_mt(rows[[col]], col, cfg$unit))
+}
+
+calc_trade_y_range <- function(trade_type, product, x_max) {
+  all_vals <- bind_rows(
+    get_trade_fable(trade_type, product, "Current Trends",  x_max),
+    get_trade_fable(trade_type, product, "NDC Commitments", x_max)
+  )$value
+  pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
+  c(0, max(all_vals, na.rm = TRUE) + pad)
+}
+
+# ── Trade plot builders ───────────────────────────────────────────────────────
+make_trade_combined_plot <- function(trade_type, product, x_max, y_range, chart_type) {
+  hover <- function(nm) paste0("%{x}: <b>%{y:.2f} Mt</b><extra>", nm, "</extra>")
+  ct    <- get_trade_fable(trade_type, product, "Current Trends",  x_max)
+  ndc   <- get_trade_fable(trade_type, product, "NDC Commitments", x_max)
+
+  if (chart_type == "Bar chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "bar", name = "Current Trends",
+                marker = list(color = COL_CT,  line = list(color = "black", width = 1)),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
+                marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
+                hovertemplate = hover("NDC Commitments"))
+  } else {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
+                name = "Current Trends",
+                line = list(color = COL_CT,  width = 2), marker = list(color = COL_CT,  size = 7),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
+                name = "NDC Commitments",
+                line = list(color = COL_NDC, width = 2), marker = list(color = COL_NDC, size = 7),
+                hovertemplate = hover("NDC Commitments"))
+  }
+  base_layout(p, paste0(product, " ", trade_type, ": Current Trends vs NDC Commitments"),
+              x_max = x_max, y_range = y_range, y_label = paste0(trade_type, " (Mt)"),
+              barmode = if (chart_type == "Bar chart") "group" else NULL)
+}
+
+make_trade_single_plot <- function(trade_type, product, scenario_name, bar_color,
+                                   x_max, y_range, chart_type) {
+  hover_tmpl <- paste0("%{x}: <b>%{y:.2f} Mt</b><extra>", scenario_name, "</extra>")
+  scen <- get_trade_fable(trade_type, product, scenario_name, x_max)
+
+  if (chart_type == "Bar chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
+                marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
+                name = scenario_name,
+                line = list(color = bar_color, width = 2), marker = list(color = bar_color, size = 7),
+                hovertemplate = hover_tmpl)
+  }
+  base_layout(p, paste0(product, " ", trade_type, ": ", scenario_name),
+              bar_color, x_max = x_max, y_range = y_range,
+              y_label = paste0(trade_type, " (Mt)"),
+              barmode = if (chart_type == "Bar chart") "group" else NULL)
+}
+
+# ── Trade table builder ───────────────────────────────────────────────────────
+make_trade_table_data <- function(trade_type, product, scenario_sel, x_max) {
+  years <- seq(2000, x_max, 5)
+
+  pull_fable <- function(scen_name)
+    get_trade_fable(trade_type, product, scen_name, x_max) %>%
+      filter(year %in% years) %>% arrange(year) %>% pull(value)
+
+  rows <- list()
+  if (scenario_sel %in% c("Both", "Current Trends"))
+    rows[["Current Trends"]] <- pull_fable("Current Trends")
+  if (scenario_sel %in% c("Both", "NDC Commitments"))
+    rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
+
+  mat <- do.call(rbind, rows)
+  df  <- as.data.frame(mat)
+  colnames(df) <- as.character(years)
+  cbind(` ` = rownames(df), df, stringsAsFactors = FALSE)
+}
+
 # ── Emissions configuration ───────────────────────────────────────────────────
 # FABLE columns are already in Mt CO2e.
 # Historical data (SEEG13) is in million tonnes of the gas → multiply by hist_gwp.
@@ -1068,10 +1180,34 @@ ui <- navbarPage(
 
   tabPanel(HTML("🚢 Trade"),
     br(),
-    div(style = "text-align: center; padding: 80px; color: #888;",
-        div(style = "font-size: 48px;", "🚢"),
-        div(style = "font-size: 18px; margin-top: 12px;", "Under development")
-    )
+    fluidRow(
+      column(2,
+        selectInput("trade_type", "Type:",
+                    choices  = c("Exports", "Imports"),
+                    selected = "Exports")
+      ),
+      column(2,
+        selectInput("trade_product", "Product:",
+                    choices  = c("Soybeans", "Corn", "Beef"),
+                    selected = "Soybeans")
+      ),
+      column(2,
+        selectInput("trade_scenario", "Scenario:",
+                    choices  = c("Both", "Current Trends", "NDC Commitments"),
+                    selected = "Both")
+      ),
+      column(3,
+        selectInput("trade_years", "Years:",
+                    choices  = c("Calibration & Projections", "Calibration"),
+                    selected = "Calibration & Projections")
+      ),
+      column(3,
+        selectInput("trade_chart_type", "Chart type:",
+                    choices  = c("Line chart", "Bar chart"),
+                    selected = "Line chart")
+      )
+    ),
+    uiOutput("trade_charts_ui")
   ),
 
   tabPanel(HTML("🍽️ Food"),
@@ -1305,6 +1441,68 @@ server <- function(input, output, session) {
   })
   output$live_plot_ndc <- renderPlotly({
     make_live_single_plot(input$live_product, "NDC Commitments", COL_NDC, live_x_max(), live_y_range(), input$live_chart_type)
+  })
+
+  # ── Trade tab ─────────────────────────────────────────────────────────────────
+  observeEvent(input$trade_type, {
+    choices <- trade_map[[input$trade_type]]$products
+    updateSelectInput(session, "trade_product",
+                      choices  = choices,
+                      selected = choices[1])
+  })
+
+  trade_x_max <- reactive({
+    if (input$trade_years == "Calibration") 2020L else 2050L
+  })
+
+  trade_y_range <- reactive({
+    req(input$trade_type %in% names(trade_map),
+        input$trade_product %in% trade_map[[input$trade_type]]$products)
+    calc_trade_y_range(input$trade_type, input$trade_product, trade_x_max())
+  })
+
+  output$trade_charts_ui <- renderUI({
+    req(input$trade_type %in% names(trade_map),
+        input$trade_product %in% trade_map[[input$trade_type]]$products)
+
+    right_col <- tagList(
+      strong(paste0(input$trade_type, " (Mt)")),
+      div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+          tableOutput("trade_data_table"))
+    )
+
+    switch(input$trade_scenario,
+      "Both"            = fluidRow(
+        column(6, plotlyOutput("trade_plot_both", height = "460px")),
+        column(6, right_col)
+      ),
+      "Current Trends"  = fluidRow(
+        column(6, plotlyOutput("trade_plot_ct",   height = "460px")),
+        column(6, right_col)
+      ),
+      "NDC Commitments" = fluidRow(
+        column(6, plotlyOutput("trade_plot_ndc",  height = "460px")),
+        column(6, right_col)
+      )
+    )
+  })
+
+  output$trade_data_table <- renderTable(
+    make_trade_table_data(input$trade_type, input$trade_product,
+                          input$trade_scenario, trade_x_max()),
+    digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+  output$trade_plot_both <- renderPlotly({
+    make_trade_combined_plot(input$trade_type, input$trade_product,
+                             trade_x_max(), trade_y_range(), input$trade_chart_type)
+  })
+  output$trade_plot_ct <- renderPlotly({
+    make_trade_single_plot(input$trade_type, input$trade_product, "Current Trends",
+                           COL_CT, trade_x_max(), trade_y_range(), input$trade_chart_type)
+  })
+  output$trade_plot_ndc <- renderPlotly({
+    make_trade_single_plot(input$trade_type, input$trade_product, "NDC Commitments",
+                           COL_NDC, trade_x_max(), trade_y_range(), input$trade_chart_type)
   })
 
   # ── Emissions tab ─────────────────────────────────────────────────────────────

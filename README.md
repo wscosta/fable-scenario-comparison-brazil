@@ -233,3 +233,26 @@ Only **Beef** has a historical series (Ruminant Meat, FAOSTAT). For Milk, Chicke
 | Milk | `milk` | — |
 | Chicken | `chicken` | — |
 | Pork | `pork` | — |
+
+## 🚢 Shiny app — Trade tab
+
+| Control | Options |
+|---------|---------|
+| **Type** | Exports · Imports |
+| **Product** | Depends on Type (see below) |
+| **Scenario** | Both · Current Trends · NDC Commitments |
+| **Years** | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
+| **Chart type** | Line chart · Bar chart |
+
+The Product selector updates automatically when Type changes. All values are in **Mt** (million tonnes), converted from the `Export_quantity` / `Import_quantity` columns in the FABLE crop table (1 000 t).
+
+No historical data is available for any trade variable — the chart shows FABLE scenario lines only and the right panel shows a values table with no difference tables.
+
+### Products per type
+
+| Type | Products | FABLE product key |
+|------|----------|-------------------|
+| Exports | Soybeans | `soyabean` |
+| Exports | Corn | `corn` |
+| Exports | Beef | `beef` |
+| Imports | Wheat | `wheat` |
