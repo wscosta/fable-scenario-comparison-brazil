@@ -128,7 +128,7 @@ base_layout <- function(p, title_text, title_color = "black", x_max, y_range,
 }
 
 # ── Compute shared y-range ────────────────────────────────────────────────────
-calc_y_range <- function(class_name, x_max) {
+calc_y_range <- function(class_name, x_max, zero_base = TRUE) {
   cfg  <- landuse_map[[class_name]]
   col  <- cfg$fable_col
   scen_vals <- to_mha(
@@ -139,7 +139,9 @@ calc_y_range <- function(class_name, x_max) {
   hist_vals <- get_hist(class_name, x_max)$value
   all_vals  <- c(scen_vals, hist_vals)
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
-  c(0, max(all_vals, na.rm = TRUE) + pad)
+  y_min <- if (zero_base && min(all_vals, na.rm = TRUE) >= 0) 0
+            else min(all_vals, na.rm = TRUE) - pad
+  c(y_min, max(all_vals, na.rm = TRUE) + pad)
 }
 
 # ── Plot builders ─────────────────────────────────────────────────────────────
@@ -429,7 +431,7 @@ get_crop_fable <- function(crop_name, type_sel, scenario_name, x_max) {
   tibble(year = rows$Year, value = prod / area)  # Yield (t/ha)
 }
 
-calc_crop_y_range <- function(crop_name, type_sel, x_max) {
+calc_crop_y_range <- function(crop_name, type_sel, x_max, zero_base = TRUE) {
   scen_vals <- bind_rows(
     get_crop_fable(crop_name, type_sel, "Current Trends",  x_max),
     get_crop_fable(crop_name, type_sel, "NDC Commitments", x_max)
@@ -437,7 +439,9 @@ calc_crop_y_range <- function(crop_name, type_sel, x_max) {
   hist_vals <- get_crop_hist_data(crop_name, type_sel, x_max)$value
   all_vals  <- c(scen_vals, hist_vals)
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
-  c(0, max(all_vals, na.rm = TRUE) + pad)
+  y_min <- if (zero_base && min(all_vals, na.rm = TRUE) >= 0) 0
+            else min(all_vals, na.rm = TRUE) - pad
+  c(y_min, max(all_vals, na.rm = TRUE) + pad)
 }
 
 # ── Crop plot builders ────────────────────────────────────────────────────────
@@ -623,7 +627,7 @@ get_live_hist <- function(product, x_max) {
     mutate(value = as.numeric(value))
 }
 
-calc_live_y_range <- function(product, x_max) {
+calc_live_y_range <- function(product, x_max, zero_base = TRUE) {
   scen_vals <- bind_rows(
     get_live_fable(product, "Current Trends",  x_max),
     get_live_fable(product, "NDC Commitments", x_max)
@@ -631,7 +635,9 @@ calc_live_y_range <- function(product, x_max) {
   hist_vals <- get_live_hist(product, x_max)$value
   all_vals  <- c(scen_vals, hist_vals)
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
-  c(0, max(all_vals, na.rm = TRUE) + pad)
+  y_min <- if (zero_base && min(all_vals, na.rm = TRUE) >= 0) 0
+            else min(all_vals, na.rm = TRUE) - pad
+  c(y_min, max(all_vals, na.rm = TRUE) + pad)
 }
 
 # ── Livestock plot builders ───────────────────────────────────────────────────
@@ -807,13 +813,15 @@ get_trade_fable <- function(trade_type, product, scenario_name, x_max) {
     rename(year = Year)
 }
 
-calc_trade_y_range <- function(trade_type, product, x_max) {
+calc_trade_y_range <- function(trade_type, product, x_max, zero_base = TRUE) {
   all_vals <- bind_rows(
     get_trade_fable(trade_type, product, "Current Trends",  x_max),
     get_trade_fable(trade_type, product, "NDC Commitments", x_max)
   )$value
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
-  c(0, max(all_vals, na.rm = TRUE) + pad)
+  y_min <- if (zero_base && min(all_vals, na.rm = TRUE) >= 0) 0
+            else min(all_vals, na.rm = TRUE) - pad
+  c(y_min, max(all_vals, na.rm = TRUE) + pad)
 }
 
 # ── Trade plot builders ───────────────────────────────────────────────────────
@@ -907,13 +915,15 @@ get_food_fable <- function(variable, scenario_name, x_max) {
     arrange(year)
 }
 
-calc_food_y_range <- function(variable, x_max) {
+calc_food_y_range <- function(variable, x_max, zero_base = TRUE) {
   all_vals <- bind_rows(
     get_food_fable(variable, "Current Trends",  x_max),
     get_food_fable(variable, "NDC Commitments", x_max)
   )$value
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
-  c(0, max(all_vals, na.rm = TRUE) + pad)
+  y_min <- if (zero_base && min(all_vals, na.rm = TRUE) >= 0) 0
+            else min(all_vals, na.rm = TRUE) - pad
+  c(y_min, max(all_vals, na.rm = TRUE) + pad)
 }
 
 # ── Food plot builders ────────────────────────────────────────────────────────
@@ -1061,7 +1071,7 @@ get_emiss_hist <- function(emiss_name, x_max) {
     summarise(value = sum(as.numeric(value), na.rm = TRUE) * cfg$hist_gwp, .groups = "drop")
 }
 
-calc_emiss_y_range <- function(emiss_name, x_max) {
+calc_emiss_y_range <- function(emiss_name, x_max, zero_base = TRUE) {
   scen_vals <- bind_rows(
     get_emiss_fable(emiss_name, "Current Trends",  x_max),
     get_emiss_fable(emiss_name, "NDC Commitments", x_max)
@@ -1070,7 +1080,7 @@ calc_emiss_y_range <- function(emiss_name, x_max) {
   all_vals  <- c(scen_vals, hist_vals)
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
   y_min <- min(all_vals, na.rm = TRUE)
-  c(if (y_min < 0) y_min - pad else 0, max(all_vals, na.rm = TRUE) + pad)
+  c(if (zero_base && y_min >= 0) 0 else y_min - pad, max(all_vals, na.rm = TRUE) + pad)
 }
 
 make_emiss_combined_plot <- function(emiss_name, x_max, y_range, chart_type) {
@@ -1264,7 +1274,8 @@ ui <- page_navbar(
                     selected = "Calibration & Projections"),
         radioButtons("chart_type", "Chart type",
                     choices  = c("Line chart", "Bar chart"),
-                    selected = "Line chart")
+                    selected = "Line chart"),
+        checkboxInput("zero_base", "Start y-axis at zero", value = TRUE)
       ),
       uiOutput("charts_ui")
     )
@@ -1284,7 +1295,8 @@ ui <- page_navbar(
                     selected = "Calibration & Projections"),
         radioButtons("emiss_chart_type", "Chart type",
                     choices  = c("Line chart", "Bar chart"),
-                    selected = "Line chart")
+                    selected = "Line chart"),
+        checkboxInput("emiss_zero_base", "Start y-axis at zero", value = FALSE)
       ),
       uiOutput("emiss_charts_ui")
     )
@@ -1307,7 +1319,8 @@ ui <- page_navbar(
                     selected = "Calibration & Projections"),
         radioButtons("crop_chart_type", "Chart type",
                     choices  = c("Line chart", "Bar chart"),
-                    selected = "Line chart")
+                    selected = "Line chart"),
+        checkboxInput("crop_zero_base", "Start y-axis at zero", value = TRUE)
       ),
       uiOutput("crop_charts_ui")
     )
@@ -1329,7 +1342,8 @@ ui <- page_navbar(
                     selected = "Calibration & Projections"),
         radioButtons("live_chart_type", "Chart type",
                     choices  = c("Line chart", "Bar chart"),
-                    selected = "Line chart")
+                    selected = "Line chart"),
+        checkboxInput("live_zero_base", "Start y-axis at zero", value = TRUE)
       ),
       uiOutput("live_charts_ui")
     )
@@ -1353,7 +1367,8 @@ ui <- page_navbar(
                     selected = "Calibration & Projections"),
         radioButtons("trade_chart_type", "Chart type",
                     choices  = c("Line chart", "Bar chart"),
-                    selected = "Line chart")
+                    selected = "Line chart"),
+        checkboxInput("trade_zero_base", "Start y-axis at zero", value = TRUE)
       ),
       uiOutput("trade_charts_ui")
     )
@@ -1373,7 +1388,8 @@ ui <- page_navbar(
                     selected = "Calibration & Projections"),
         radioButtons("food_chart_type", "Chart type",
                     choices  = c("Line chart", "Bar chart"),
-                    selected = "Line chart")
+                    selected = "Line chart"),
+        checkboxInput("food_zero_base", "Start y-axis at zero", value = TRUE)
       ),
       uiOutput("food_charts_ui")
     )
@@ -1388,7 +1404,7 @@ server <- function(input, output, session) {
   })
 
   y_range <- reactive({
-    calc_y_range(input$class_sel, x_max())
+    calc_y_range(input$class_sel, x_max(), input$zero_base)
   })
 
   output$charts_ui <- renderUI({
@@ -1479,7 +1495,7 @@ server <- function(input, output, session) {
 
   crop_y_range <- reactive({
     req(length(crops_map) > 0, input$crop_name %in% names(crops_map))
-    calc_crop_y_range(input$crop_name, input$crop_type, crop_x_max())
+    calc_crop_y_range(input$crop_name, input$crop_type, crop_x_max(), input$crop_zero_base)
   })
 
   output$crop_charts_ui <- renderUI({
@@ -1571,7 +1587,7 @@ server <- function(input, output, session) {
 
   live_y_range <- reactive({
     req(length(livestock_map) > 0, input$live_product %in% names(livestock_map))
-    calc_live_y_range(input$live_product, live_x_max())
+    calc_live_y_range(input$live_product, live_x_max(), input$live_zero_base)
   })
 
   output$live_charts_ui <- renderUI({
@@ -1669,7 +1685,7 @@ server <- function(input, output, session) {
   trade_y_range <- reactive({
     req(input$trade_type %in% names(trade_map),
         input$trade_product %in% trade_map[[input$trade_type]]$products)
-    calc_trade_y_range(input$trade_type, input$trade_product, trade_x_max())
+    calc_trade_y_range(input$trade_type, input$trade_product, trade_x_max(), input$trade_zero_base)
   })
 
   output$trade_charts_ui <- renderUI({
@@ -1737,7 +1753,7 @@ server <- function(input, output, session) {
 
   food_y_range <- reactive({
     req(input$food_variable %in% names(food_map))
-    calc_food_y_range(input$food_variable, food_x_max())
+    calc_food_y_range(input$food_variable, food_x_max(), input$food_zero_base)
   })
 
   output$food_charts_ui <- renderUI({
@@ -1799,7 +1815,12 @@ server <- function(input, output, session) {
 
   emiss_y_range <- reactive({
     req(length(emissions_map) > 0, input$emiss_sel %in% names(emissions_map))
-    calc_emiss_y_range(input$emiss_sel, emiss_x_max())
+    calc_emiss_y_range(input$emiss_sel, emiss_x_max(), input$emiss_zero_base)
+  })
+
+  observeEvent(input$emiss_sel, {
+    updateCheckboxInput(session, "emiss_zero_base",
+                        value = input$emiss_sel != "CO₂ AFOLU")
   })
 
   output$emiss_charts_ui <- renderUI({
