@@ -1,6 +1,7 @@
 library(shiny)
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(plotly))
+suppressPackageStartupMessages(library(bslib))
 
 # Run 01_process_data.R first if any processed file is missing
 if (!file.exists("data/processed/df_scenarios.rds") ||
@@ -1205,12 +1206,41 @@ make_emiss_rel_diff_colored <- function(emiss_name, scenario_sel) {
 addResourcePath("images", normalizePath("data/images", mustWork = FALSE))
 
 # ── UI ────────────────────────────────────────────────────────────────────────
-ui <- navbarPage(
+ui <- page_navbar(
   title = HTML('<span style="display:inline-flex; align-items:center; gap:8px;"><img src="images/fable_logo.png" height="26" style="border-radius:4px;">FABLE-Calculator Brazil v50</span>'),
-  windowTitle = "FABLE-Calculator Brazil v50",
-  header = tags$head(tags$link(rel = "icon", type = "image/svg+xml", href = "images/favicon.svg")),
+  window_title = "FABLE-Calculator Brazil v50",
+  header = tags$head(
+    tags$link(rel = "icon", type = "image/svg+xml", href = "images/favicon.svg"),
+    tags$style(HTML("
+      .navbar .container-fluid {
+        display: flex !important;
+        flex-wrap: wrap !important;
+      }
+      .navbar-brand {
+        flex: 0 0 100% !important;
+        padding-bottom: 2px;
+      }
+      .navbar-collapse {
+        flex: 0 0 100% !important;
+      }
+      .navbar-nav {
+        flex-direction: row !important;
+      }
+      .navbar-nav .nav-link {
+        font-size: 1rem;
+      }
+      .tab-pane > br:first-child {
+        display: none;
+      }
+      .tab-content {
+        padding-top: 8px;
+      }
+    "))
+  ),
+  theme = bs_theme(primary = "#007B8A", version = 5),
+  bg = "#B8E8EE",
 
-  tabPanel(HTML("🗺️ Land-use"),
+  nav_panel(HTML("🗺️ Land-use"),
     br(),
     fluidRow(
       column(3,
@@ -1237,7 +1267,7 @@ ui <- navbarPage(
     uiOutput("charts_ui")
   ),
 
-  tabPanel(HTML("🌫️ Emissions"),
+  nav_panel(HTML("🌫️ Emissions"),
     br(),
     fluidRow(
       column(3,
@@ -1264,7 +1294,7 @@ ui <- navbarPage(
     uiOutput("emiss_charts_ui")
   ),
 
-  tabPanel(HTML("🌾 Crops"),
+  nav_panel(HTML("🌾 Crops"),
     br(),
     fluidRow(
       column(2,
@@ -1296,7 +1326,7 @@ ui <- navbarPage(
     uiOutput("crop_charts_ui")
   ),
 
-  tabPanel(HTML("🐄 Livestock"),
+  nav_panel(HTML("🐄 Livestock"),
     br(),
     fluidRow(
       column(3,
@@ -1325,7 +1355,7 @@ ui <- navbarPage(
     uiOutput("live_charts_ui")
   ),
 
-  tabPanel(HTML("🚢 Trade"),
+  nav_panel(HTML("🚢 Trade"),
     br(),
     fluidRow(
       column(2,
@@ -1358,7 +1388,7 @@ ui <- navbarPage(
     uiOutput("trade_charts_ui")
   ),
 
-  tabPanel(HTML("🍽️ Food"),
+  nav_panel(HTML("🍽️ Food"),
     br(),
     fluidRow(
       column(3,

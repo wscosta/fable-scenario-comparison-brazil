@@ -22,11 +22,12 @@ R (≥ 4.1) with the following packages:
 | `tidyr` | Data reshaping |
 | `shiny` | Web app framework |
 | `plotly` | Interactive charts |
+| `bslib` | Bootstrap 5 theming |
 
 Install all at once from the R console:
 
 ```r
-install.packages(c("readxl", "dplyr", "tidyr", "shiny", "plotly"))
+install.packages(c("readxl", "dplyr", "tidyr", "shiny", "plotly", "bslib"))
 ```
 
 ## 📁 Repository structure
@@ -94,6 +95,10 @@ To force a full re-read of the source files:
 ```r
 source("01_process_data.R")
 ```
+
+## 🎨 UI theme
+
+The app uses **Bootstrap 5** via the `bslib` package. The navbar displays in two rows — app title on the first line and tab names on the second — against a light turquoise background (`#B8E8EE`). Interactive elements (active tabs, focused inputs, buttons) use a darker turquoise accent (`#007B8A`).
 
 ## 📊 Shiny app — Land-use tab
 
