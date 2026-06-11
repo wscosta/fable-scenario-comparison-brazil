@@ -262,6 +262,17 @@ No historical data is available for any trade variable — the chart shows FABLE
 | Exports | Beef | `beef` |
 | Imports | Wheat | `wheat` |
 
+## 🐄 Shiny app — Livestock tab (additional variables)
+
+In addition to production (Mt) for Beef, Milk, Chicken and Pork, the Livestock tab includes two cattle-specific variables sourced from the `5_feas_livestock` sheet:
+
+| Variable | Source column | Unit | Data source |
+|----------|--------------|------|-------------|
+| Cattle Herd | `FeasHerd` | Million TLU | `5_feas_livestock`, cattle rows summed (BOVO + BOVD), converted from 1 000 TLU |
+| Cattle Stocking Rate | `RumDensity` | TLU/ha | `5_feas_livestock`, cattle rows (same value across sub-types, first taken) |
+
+Neither variable has a historical series — the chart shows scenario lines only with no difference tables.
+
 ## 🍽️ Shiny app — Food tab
 
 | Control | Options |

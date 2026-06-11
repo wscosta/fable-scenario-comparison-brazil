@@ -66,6 +66,37 @@ df_crops <- bind_rows(
 message("── Crop products found ───────────────────────────────────────")
 print(sort(unique(df_crops$Product)))
 
+# ── Read cattle herd/density table (5_feas_livestock, header at row 29) ───────
+# Filter ANIMAL == "cattle"; two rows per year (BOVO + BOVD) → sum FeasHerd,
+# first RumDensity (identical across sub-types within a year).
+read_livestock_table <- function(path, scenario_label) {
+  # Sheet has multiple side-by-side tables causing duplicate column names.
+  # Read only the first 5 columns (A:E) and assign names explicitly.
+  raw <- read_excel(path, sheet = "5_feas_livestock", skip = 28,
+                    col_names = FALSE, col_types = "text")
+  raw <- raw[, 1:5]
+  names(raw) <- c("ANIMAL_GLOBIOM", "ANIMAL", "YEAR", "FeasHerd", "RumDensity")
+  raw %>%
+    filter(!is.na(ANIMAL), !is.na(YEAR),
+           trimws(tolower(ANIMAL)) == "cattle") %>%
+    mutate(Year     = suppressWarnings(as.integer(YEAR)),
+           scenario = scenario_label) %>%
+    filter(!is.na(Year), Year >= 2000, Year <= 2050) %>%
+    mutate(FeasHerd   = as.numeric(FeasHerd),
+           RumDensity = as.numeric(RumDensity)) %>%
+    group_by(scenario, Year) %>%
+    summarise(
+      FeasHerd   = sum(FeasHerd,    na.rm = TRUE),
+      RumDensity = first(RumDensity),
+      .groups    = "drop"
+    )
+}
+
+df_livestock <- bind_rows(
+  read_livestock_table(path_ct,  "Current Trends"),
+  read_livestock_table(path_ndc, "NDC Commitments")
+)
+
 # ── Read historical data ──────────────────────────────────────────────────────
 df_hist <- read.csv(path_hist, check.names = FALSE, stringsAsFactors = FALSE)
 colnames(df_hist) <- trimws(colnames(df_hist))
@@ -78,8 +109,9 @@ fable_units <- read_units(path_ct)
 
 # ── Save ──────────────────────────────────────────────────────────────────────
 dir.create("data/processed", showWarnings = FALSE, recursive = TRUE)
-saveRDS(df_scenarios, "data/processed/df_scenarios.rds")
-saveRDS(df_hist,      "data/processed/df_hist.rds")
-saveRDS(fable_units,  "data/processed/fable_units.rds")
-saveRDS(df_crops,     "data/processed/df_crops.rds")
-message("Saved: df_scenarios.rds, df_hist.rds, fable_units.rds, df_crops.rds")
+saveRDS(df_scenarios,  "data/processed/df_scenarios.rds")
+saveRDS(df_hist,       "data/processed/df_hist.rds")
+saveRDS(fable_units,   "data/processed/fable_units.rds")
+saveRDS(df_crops,      "data/processed/df_crops.rds")
+saveRDS(df_livestock,  "data/processed/df_livestock.rds")
+message("Saved: df_scenarios.rds, df_hist.rds, fable_units.rds, df_crops.rds, df_livestock.rds")

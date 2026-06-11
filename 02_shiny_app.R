@@ -5,7 +5,8 @@ suppressPackageStartupMessages(library(plotly))
 # Run 01_process_data.R first if any processed file is missing
 if (!file.exists("data/processed/df_scenarios.rds") ||
     !file.exists("data/processed/fable_units.rds")  ||
-    !file.exists("data/processed/df_crops.rds")) {
+    !file.exists("data/processed/df_crops.rds")     ||
+    !file.exists("data/processed/df_livestock.rds")) {
   source("01_process_data.R")
 }
 
@@ -13,6 +14,7 @@ df_scenarios <- readRDS("data/processed/df_scenarios.rds")
 df_hist      <- readRDS("data/processed/df_hist.rds")
 fable_units  <- readRDS("data/processed/fable_units.rds")
 df_crops     <- readRDS("data/processed/df_crops.rds")
+df_livestock <- readRDS("data/processed/df_livestock.rds")
 
 # ── Unit conversion ───────────────────────────────────────────────────────────
 to_mha <- function(values, col_name, unit_override = NULL) {
@@ -566,25 +568,46 @@ make_crop_rel_diff_colored <- function(crop_name, type_sel, scenario_sel) {
 }
 
 # ── Livestock configuration ───────────────────────────────────────────────────
-# Data from df_crops (same second table as Crops tab), ProdQ_feas in 1000 t → Mt.
-# Only Beef has a historical series (Ruminant Meat, FAOSTAT).
+# Entries with fable_product come from df_crops (ProdQ_feas, 1000 t → Mt).
+# Entries with fable_col come from df_livestock (5_feas_livestock sheet).
 livestock_map <- list(
-  "Beef"    = list(fable_product = "beef",    prod_unit = "1000 t",
-                   hist_type = "Ruminant Meat", hist_source = "FAOSTAT", has_hist = TRUE),
-  "Milk"    = list(fable_product = "milk",    prod_unit = "1000 t", has_hist = FALSE),
-  "Chicken" = list(fable_product = "chicken", prod_unit = "1000 t", has_hist = FALSE),
-  "Pork"    = list(fable_product = "pork",    prod_unit = "1000 t", has_hist = FALSE)
+  "Beef Production"    = list(fable_product = "beef",    prod_unit = "1000 t",
+                              hist_type = "Ruminant Meat", hist_source = "FAOSTAT", has_hist = TRUE,
+                              y_label = "Production (Mt)", unit_label = "Mt"),
+  "Milk Production"    = list(fable_product = "milk",    prod_unit = "1000 t", has_hist = FALSE,
+                              y_label = "Production (Mt)", unit_label = "Mt"),
+  "Chicken Production" = list(fable_product = "chicken", prod_unit = "1000 t", has_hist = FALSE,
+                              y_label = "Production (Mt)", unit_label = "Mt"),
+  "Pork Production"    = list(fable_product = "pork",    prod_unit = "1000 t", has_hist = FALSE,
+                              y_label = "Production (Mt)", unit_label = "Mt"),
+  "Cattle Herd" = list(fable_col = "FeasHerd", unit_divisor = 1000, has_hist = FALSE,
+                        y_label = "Cattle Herd (Million TLU)", unit_label = "Million TLU"),
+  "Cattle Stocking Rate" = list(fable_col = "RumDensity", unit_divisor = 1, has_hist = FALSE,
+                                 y_label = "Density (TLU/ha)", unit_label = "TLU/ha")
 )
-livestock_map <- Filter(function(cfg) cfg$fable_product %in% df_crops$Product, livestock_map)
+livestock_map <- Filter(function(cfg) {
+  if (!is.null(cfg$fable_product)) cfg$fable_product %in% df_crops$Product
+  else if (!is.null(cfg$fable_col)) cfg$fable_col %in% names(df_livestock)
+  else FALSE
+}, livestock_map)
 
 get_live_fable <- function(product, scenario_name, x_max) {
-  cfg  <- livestock_map[[product]]
-  rows <- df_crops %>%
-    filter(scenario == scenario_name,
-           trimws(Product) == cfg$fable_product,
-           Year <= x_max) %>%
-    arrange(Year)
-  tibble(year = rows$Year, value = to_mt(rows$ProdQ_feas, "ProdQ_feas", cfg$prod_unit))
+  cfg <- livestock_map[[product]]
+  if (!is.null(cfg$fable_col)) {
+    divisor <- if (!is.null(cfg$unit_divisor)) cfg$unit_divisor else 1
+    df_livestock %>%
+      filter(scenario == scenario_name, Year <= x_max) %>%
+      arrange(Year) %>%
+      select(year = Year, value = all_of(cfg$fable_col)) %>%
+      mutate(value = as.numeric(value) / divisor)
+  } else {
+    rows <- df_crops %>%
+      filter(scenario == scenario_name,
+             trimws(Product) == cfg$fable_product,
+             Year <= x_max) %>%
+      arrange(Year)
+    tibble(year = rows$Year, value = to_mt(rows$ProdQ_feas, "ProdQ_feas", cfg$prod_unit))
+  }
 }
 
 get_live_hist <- function(product, x_max) {
@@ -612,11 +635,14 @@ calc_live_y_range <- function(product, x_max) {
 
 # ── Livestock plot builders ───────────────────────────────────────────────────
 make_live_combined_plot <- function(product, x_max, y_range, chart_type) {
-  hover     <- function(nm) paste0("%{x}: <b>%{y:.2f} Mt</b><extra>", nm, "</extra>")
+  cfg       <- livestock_map[[product]]
+  unit_lbl  <- cfg$unit_label
+  y_lbl     <- cfg$y_label
+  hover     <- function(nm) paste0("%{x}: <b>%{y:.2f} ", unit_lbl, "</b><extra>", nm, "</extra>")
   ct        <- get_live_fable(product, "Current Trends",  x_max)
   ndc       <- get_live_fable(product, "NDC Commitments", x_max)
   hist_data <- get_live_hist(product, x_max)
-  src_label <- if (livestock_map[[product]]$has_hist) livestock_map[[product]]$hist_source else ""
+  src_label <- if (cfg$has_hist) cfg$hist_source else ""
 
   if (chart_type == "Bar chart") {
     p <- plot_ly() %>%
@@ -637,17 +663,20 @@ make_live_combined_plot <- function(product, x_max, y_range, chart_type) {
                 line = list(color = COL_NDC, width = 2), marker = list(color = COL_NDC, size = 7),
                 hovertemplate = hover("NDC Commitments"))
   }
-  p <- p %>% add_hist_trace(hist_data, src_label, chart_type, "Mt")
+  p <- p %>% add_hist_trace(hist_data, src_label, chart_type, unit_lbl)
   base_layout(p, paste0(product, ": Current Trends vs NDC Commitments"),
-              x_max = x_max, y_range = y_range, y_label = "Production (Mt)",
+              x_max = x_max, y_range = y_range, y_label = y_lbl,
               barmode = if (chart_type == "Bar chart") "group" else NULL)
 }
 
 make_live_single_plot <- function(product, scenario_name, bar_color, x_max, y_range, chart_type) {
-  hover_tmpl <- paste0("%{x}: <b>%{y:.2f} Mt</b><extra>", scenario_name, "</extra>")
+  cfg        <- livestock_map[[product]]
+  unit_lbl   <- cfg$unit_label
+  y_lbl      <- cfg$y_label
+  hover_tmpl <- paste0("%{x}: <b>%{y:.2f} ", unit_lbl, "</b><extra>", scenario_name, "</extra>")
   scen      <- get_live_fable(product, scenario_name, x_max)
   hist_data <- get_live_hist(product, x_max)
-  src_label <- if (livestock_map[[product]]$has_hist) livestock_map[[product]]$hist_source else ""
+  src_label <- if (cfg$has_hist) cfg$hist_source else ""
 
   if (chart_type == "Bar chart") {
     p <- plot_ly() %>%
@@ -661,9 +690,9 @@ make_live_single_plot <- function(product, scenario_name, bar_color, x_max, y_ra
                 line = list(color = bar_color, width = 2), marker = list(color = bar_color, size = 7),
                 hovertemplate = hover_tmpl)
   }
-  p <- p %>% add_hist_trace(hist_data, src_label, chart_type, "Mt")
+  p <- p %>% add_hist_trace(hist_data, src_label, chart_type, unit_lbl)
   base_layout(p, paste0(product, ": ", scenario_name),
-              bar_color, x_max = x_max, y_range = y_range, y_label = "Production (Mt)",
+              bar_color, x_max = x_max, y_range = y_range, y_label = y_lbl,
               barmode = if (chart_type == "Bar chart") "group" else NULL)
 }
 
@@ -1271,9 +1300,11 @@ ui <- navbarPage(
     br(),
     fluidRow(
       column(3,
-        selectInput("live_product", "Product:",
-                    choices  = c("Beef", "Milk", "Chicken", "Pork"),
-                    selected = "Beef")
+        selectInput("live_product", "Variable:",
+                    choices  = c("Beef Production", "Milk Production",
+                                 "Chicken Production", "Pork Production",
+                                 "Cattle Herd", "Cattle Stocking Rate"),
+                    selected = "Beef Production")
       ),
       column(3,
         selectInput("live_scenario", "Scenario:",
@@ -1520,12 +1551,14 @@ server <- function(input, output, session) {
     req(length(livestock_map) > 0)
     has_hist <- livestock_map[[input$live_product]]$has_hist
 
+    y_lbl     <- livestock_map[[input$live_product]]$y_label
+    unit_lbl  <- livestock_map[[input$live_product]]$unit_label
     right_col <- if (input$live_years == "Calibration" && has_hist) {
       tagList(
-        strong("Production (Mt)"),
+        strong(y_lbl),
         div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
             tableOutput("live_data_table")),
-        strong("Absolute Difference (Mt)"),
+        strong(paste0("Absolute Difference (", unit_lbl, ")")),
         div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
             tableOutput("live_abs_diff_table")),
         strong("Relative Difference (%)"),
@@ -1534,7 +1567,7 @@ server <- function(input, output, session) {
       )
     } else {
       tagList(
-        strong("Production (Mt)"),
+        strong(y_lbl),
         div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
             tableOutput("live_data_table"))
       )
