@@ -211,3 +211,25 @@ The historical series aggregates the following SEEG v13 subcategories and multip
 #### Note on CO2 AFOLU time range
 
 Charts and tables for **CO2 AFOLU start at 2005** (not 2000). The Calculator reports a value of 0 for the year 2000 in this column, which reflects a model calibration boundary rather than an observed or projected emission, so that data point is suppressed.
+
+## 🐄 Shiny app — Livestock tab
+
+| Control | Options |
+|---------|---------|
+| **Product** | Beef · Milk · Chicken · Pork |
+| **Scenario** | Both · Current Trends · NDC Commitments |
+| **Years** | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
+| **Chart type** | Line chart · Bar chart |
+
+All values are in **Mt** (million tonnes). Source: `ProdQ_feas` column from the FABLE crop table, converted from 1 000 t.
+
+### Historical reference
+
+Only **Beef** has a historical series (Ruminant Meat, FAOSTAT). For Milk, Chicken and Pork the chart shows scenario lines only; the values table omits the Historical row and no difference tables are shown even in Calibration mode.
+
+| Product | FABLE product | Historical source |
+|---------|--------------|-------------------|
+| Beef | `beef` | Ruminant Meat — FAOSTAT |
+| Milk | `milk` | — |
+| Chicken | `chicken` | — |
+| Pork | `pork` | — |

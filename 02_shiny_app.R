@@ -563,6 +563,177 @@ make_crop_rel_diff_colored <- function(crop_name, type_sel, scenario_sel) {
   df
 }
 
+# ── Livestock configuration ───────────────────────────────────────────────────
+# Data from df_crops (same second table as Crops tab), ProdQ_feas in 1000 t → Mt.
+# Only Beef has a historical series (Ruminant Meat, FAOSTAT).
+livestock_map <- list(
+  "Beef"    = list(fable_product = "beef",    prod_unit = "1000 t",
+                   hist_type = "Ruminant Meat", hist_source = "FAOSTAT", has_hist = TRUE),
+  "Milk"    = list(fable_product = "milk",    prod_unit = "1000 t", has_hist = FALSE),
+  "Chicken" = list(fable_product = "chicken", prod_unit = "1000 t", has_hist = FALSE),
+  "Pork"    = list(fable_product = "pork",    prod_unit = "1000 t", has_hist = FALSE)
+)
+livestock_map <- Filter(function(cfg) cfg$fable_product %in% df_crops$Product, livestock_map)
+
+get_live_fable <- function(product, scenario_name, x_max) {
+  cfg  <- livestock_map[[product]]
+  rows <- df_crops %>%
+    filter(scenario == scenario_name,
+           trimws(Product) == cfg$fable_product,
+           Year <= x_max) %>%
+    arrange(Year)
+  tibble(year = rows$Year, value = to_mt(rows$ProdQ_feas, "ProdQ_feas", cfg$prod_unit))
+}
+
+get_live_hist <- function(product, x_max) {
+  cfg <- livestock_map[[product]]
+  if (!cfg$has_hist) return(tibble(year = integer(), value = numeric()))
+  hmax <- min(x_max, 2020)
+  df_hist %>%
+    filter(trimws(type)   == cfg$hist_type,
+           trimws(source) == cfg$hist_source,
+           year > 1995, year <= hmax) %>%
+    select(year, value) %>%
+    mutate(value = as.numeric(value))
+}
+
+calc_live_y_range <- function(product, x_max) {
+  scen_vals <- bind_rows(
+    get_live_fable(product, "Current Trends",  x_max),
+    get_live_fable(product, "NDC Commitments", x_max)
+  )$value
+  hist_vals <- get_live_hist(product, x_max)$value
+  all_vals  <- c(scen_vals, hist_vals)
+  pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
+  c(0, max(all_vals, na.rm = TRUE) + pad)
+}
+
+# ── Livestock plot builders ───────────────────────────────────────────────────
+make_live_combined_plot <- function(product, x_max, y_range, chart_type) {
+  hover     <- function(nm) paste0("%{x}: <b>%{y:.2f} Mt</b><extra>", nm, "</extra>")
+  ct        <- get_live_fable(product, "Current Trends",  x_max)
+  ndc       <- get_live_fable(product, "NDC Commitments", x_max)
+  hist_data <- get_live_hist(product, x_max)
+  src_label <- if (livestock_map[[product]]$has_hist) livestock_map[[product]]$hist_source else ""
+
+  if (chart_type == "Bar chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "bar", name = "Current Trends",
+                marker = list(color = COL_CT,  line = list(color = "black", width = 1)),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
+                marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
+                hovertemplate = hover("NDC Commitments"))
+  } else {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
+                name = "Current Trends",
+                line = list(color = COL_CT,  width = 2), marker = list(color = COL_CT,  size = 7),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
+                name = "NDC Commitments",
+                line = list(color = COL_NDC, width = 2), marker = list(color = COL_NDC, size = 7),
+                hovertemplate = hover("NDC Commitments"))
+  }
+  p <- p %>% add_hist_trace(hist_data, src_label, chart_type, "Mt")
+  base_layout(p, paste0(product, ": Current Trends vs NDC Commitments"),
+              x_max = x_max, y_range = y_range, y_label = "Production (Mt)",
+              barmode = if (chart_type == "Bar chart") "group" else NULL)
+}
+
+make_live_single_plot <- function(product, scenario_name, bar_color, x_max, y_range, chart_type) {
+  hover_tmpl <- paste0("%{x}: <b>%{y:.2f} Mt</b><extra>", scenario_name, "</extra>")
+  scen      <- get_live_fable(product, scenario_name, x_max)
+  hist_data <- get_live_hist(product, x_max)
+  src_label <- if (livestock_map[[product]]$has_hist) livestock_map[[product]]$hist_source else ""
+
+  if (chart_type == "Bar chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
+                marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
+                name = scenario_name,
+                line = list(color = bar_color, width = 2), marker = list(color = bar_color, size = 7),
+                hovertemplate = hover_tmpl)
+  }
+  p <- p %>% add_hist_trace(hist_data, src_label, chart_type, "Mt")
+  base_layout(p, paste0(product, ": ", scenario_name),
+              bar_color, x_max = x_max, y_range = y_range, y_label = "Production (Mt)",
+              barmode = if (chart_type == "Bar chart") "group" else NULL)
+}
+
+# ── Livestock table builders ──────────────────────────────────────────────────
+make_live_table_data <- function(product, scenario_sel, x_max) {
+  years <- seq(2000, x_max, 5)
+  rows  <- list()
+
+  pull_fable <- function(scen_name)
+    get_live_fable(product, scen_name, x_max) %>%
+      filter(year %in% years) %>% arrange(year) %>% pull(value)
+
+  if (scenario_sel %in% c("Both", "Current Trends"))
+    rows[["Current Trends"]] <- pull_fable("Current Trends")
+  if (scenario_sel %in% c("Both", "NDC Commitments"))
+    rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
+
+  if (livestock_map[[product]]$has_hist) {
+    hist_all <- get_live_hist(product, 2020)
+    rows[["Historical"]] <- sapply(years, function(y) {
+      if (y > 2020) return(NA_real_)
+      v <- hist_all$value[hist_all$year == y]
+      if (length(v) == 0) NA_real_ else v[1]
+    })
+  }
+
+  mat <- do.call(rbind, rows)
+  df  <- as.data.frame(mat)
+  colnames(df) <- as.character(years)
+  cbind(` ` = rownames(df), df, stringsAsFactors = FALSE)
+}
+
+make_live_diff_data <- function(product, scenario_sel, type = "absolute") {
+  years <- seq(2000, 2020, 5)
+
+  hist_all  <- get_live_hist(product, 2020)
+  hist_vals <- sapply(years, function(y) {
+    if (nrow(hist_all) == 0) return(NA_real_)
+    v <- hist_all$value[hist_all$year == y]
+    if (length(v) == 0) NA_real_ else v[1]
+  })
+
+  pull_fable <- function(scen_name)
+    get_live_fable(product, scen_name, 2020) %>%
+      filter(year %in% years) %>% arrange(year) %>% pull(value)
+
+  rows <- list()
+  if (scenario_sel %in% c("Both", "Current Trends")) {
+    v <- pull_fable("Current Trends")
+    rows[["Current Trends"]] <- if (type == "absolute") abs(v - hist_vals)
+                                else (v - hist_vals) / hist_vals * 100
+  }
+  if (scenario_sel %in% c("Both", "NDC Commitments")) {
+    v <- pull_fable("NDC Commitments")
+    rows[["NDC Commitments"]] <- if (type == "absolute") abs(v - hist_vals)
+                                 else (v - hist_vals) / hist_vals * 100
+  }
+
+  mat <- do.call(rbind, rows)
+  df  <- as.data.frame(mat)
+  colnames(df) <- as.character(years)
+  cbind(` ` = rownames(df), df, stringsAsFactors = FALSE)
+}
+
+make_live_rel_diff_colored <- function(product, scenario_sel) {
+  df    <- make_live_diff_data(product, scenario_sel, "relative")
+  years <- names(df)[-1]
+  for (y in years)
+    df[[y]] <- vapply(as.numeric(df[[y]]), color_rel_val, character(1))
+  df
+}
+
 # ── Emissions configuration ───────────────────────────────────────────────────
 # FABLE columns are already in Mt CO2e.
 # Historical data (SEEG13) is in million tonnes of the gas → multiply by hist_gwp.
@@ -870,10 +1041,29 @@ ui <- navbarPage(
 
   tabPanel(HTML("🐄 Livestock"),
     br(),
-    div(style = "text-align: center; padding: 80px; color: #888;",
-        div(style = "font-size: 48px;", "🐄"),
-        div(style = "font-size: 18px; margin-top: 12px;", "Under development")
-    )
+    fluidRow(
+      column(3,
+        selectInput("live_product", "Product:",
+                    choices  = c("Beef", "Milk", "Chicken", "Pork"),
+                    selected = "Beef")
+      ),
+      column(3,
+        selectInput("live_scenario", "Scenario:",
+                    choices  = c("Both", "Current Trends", "NDC Commitments"),
+                    selected = "Both")
+      ),
+      column(3,
+        selectInput("live_years", "Years:",
+                    choices  = c("Calibration & Projections", "Calibration"),
+                    selected = "Calibration & Projections")
+      ),
+      column(3,
+        selectInput("live_chart_type", "Chart type:",
+                    choices  = c("Line chart", "Bar chart"),
+                    selected = "Line chart")
+      )
+    ),
+    uiOutput("live_charts_ui")
   ),
 
   tabPanel(HTML("🚢 Trade"),
@@ -1042,6 +1232,79 @@ server <- function(input, output, session) {
   })
   output$crop_plot_ndc <- renderPlotly({
     make_crop_single_plot(input$crop_name, input$crop_type, "NDC Commitments", COL_NDC, crop_x_max(), crop_y_range(), input$crop_chart_type)
+  })
+
+  # ── Livestock tab ─────────────────────────────────────────────────────────────
+  live_x_max <- reactive({
+    if (input$live_years == "Calibration") 2020L else 2050L
+  })
+
+  live_y_range <- reactive({
+    req(length(livestock_map) > 0, input$live_product %in% names(livestock_map))
+    calc_live_y_range(input$live_product, live_x_max())
+  })
+
+  output$live_charts_ui <- renderUI({
+    req(length(livestock_map) > 0)
+    has_hist <- livestock_map[[input$live_product]]$has_hist
+
+    right_col <- if (input$live_years == "Calibration" && has_hist) {
+      tagList(
+        strong("Production (Mt)"),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("live_data_table")),
+        strong("Absolute Difference (Mt)"),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("live_abs_diff_table")),
+        strong("Relative Difference (%)"),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("live_rel_diff_table"))
+      )
+    } else {
+      tagList(
+        strong("Production (Mt)"),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("live_data_table"))
+      )
+    }
+
+    switch(input$live_scenario,
+      "Both"            = fluidRow(
+        column(6, plotlyOutput("live_plot_both", height = "460px")),
+        column(6, right_col)
+      ),
+      "Current Trends"  = fluidRow(
+        column(6, plotlyOutput("live_plot_ct",   height = "460px")),
+        column(6, right_col)
+      ),
+      "NDC Commitments" = fluidRow(
+        column(6, plotlyOutput("live_plot_ndc",  height = "460px")),
+        column(6, right_col)
+      )
+    )
+  })
+
+  output$live_data_table <- renderTable(
+    make_live_table_data(input$live_product, input$live_scenario, live_x_max()),
+    digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+  output$live_abs_diff_table <- renderTable(
+    make_live_diff_data(input$live_product, input$live_scenario, "absolute"),
+    digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+  output$live_rel_diff_table <- renderTable(
+    make_live_rel_diff_colored(input$live_product, input$live_scenario),
+    sanitize.text.function = identity,
+    na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+  output$live_plot_both <- renderPlotly({
+    make_live_combined_plot(input$live_product, live_x_max(), live_y_range(), input$live_chart_type)
+  })
+  output$live_plot_ct <- renderPlotly({
+    make_live_single_plot(input$live_product, "Current Trends",  COL_CT,  live_x_max(), live_y_range(), input$live_chart_type)
+  })
+  output$live_plot_ndc <- renderPlotly({
+    make_live_single_plot(input$live_product, "NDC Commitments", COL_NDC, live_x_max(), live_y_range(), input$live_chart_type)
   })
 
   # ── Emissions tab ─────────────────────────────────────────────────────────────
