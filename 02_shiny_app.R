@@ -741,8 +741,16 @@ trade_map <- list(
   "Exports" = list(
     fable_col = "Export_quantity",
     unit      = "1000 t",
-    products  = c("Soybeans", "Corn", "Beef"),
-    fable_product = list("Soybeans" = "soyabean", "Corn" = "corn", "Beef" = "beef")
+    products  = c("Soybeans (all)", "Soybeans (grain)", "Soybeans (cake)", "Soybeans (oil)",
+                  "Corn", "Beef"),
+    fable_product = list(
+      "Soybeans (all)"   = c("soyabean", "soycake", "soyoil"),
+      "Soybeans (grain)" = "soyabean",
+      "Soybeans (cake)"  = "soycake",
+      "Soybeans (oil)"   = "soyoil",
+      "Corn"             = "corn",
+      "Beef"             = "beef"
+    )
   ),
   "Imports" = list(
     fable_col = "Import_quantity",
@@ -753,15 +761,18 @@ trade_map <- list(
 )
 
 get_trade_fable <- function(trade_type, product, scenario_name, x_max) {
-  cfg  <- trade_map[[trade_type]]
-  col  <- cfg$fable_col
-  prod <- cfg$fable_product[[product]]
-  rows <- df_crops %>%
+  cfg   <- trade_map[[trade_type]]
+  col   <- cfg$fable_col
+  prods <- cfg$fable_product[[product]]
+  df_crops %>%
     filter(scenario == scenario_name,
-           trimws(Product) == prod,
+           trimws(Product) %in% prods,
            Year <= x_max) %>%
-    arrange(Year)
-  tibble(year = rows$Year, value = to_mt(rows[[col]], col, cfg$unit))
+    group_by(Year) %>%
+    summarise(value = to_mt(sum(.data[[col]], na.rm = TRUE), col, cfg$unit),
+              .groups = "drop") %>%
+    arrange(Year) %>%
+    rename(year = Year)
 }
 
 calc_trade_y_range <- function(trade_type, product, x_max) {
@@ -1288,8 +1299,9 @@ ui <- navbarPage(
       ),
       column(2,
         selectInput("trade_product", "Product:",
-                    choices  = c("Soybeans", "Corn", "Beef"),
-                    selected = "Soybeans")
+                    choices  = c("Soybeans (all)", "Soybeans (grain)", "Soybeans (cake)",
+                                 "Soybeans (oil)", "Corn", "Beef"),
+                    selected = "Soybeans (all)")
       ),
       column(2,
         selectInput("trade_scenario", "Scenario:",
