@@ -250,9 +250,12 @@ No historical data is available for any trade variable — the chart shows FABLE
 
 ### Products per type
 
-| Type | Products | FABLE product key |
-|------|----------|-------------------|
-| Exports | Soybeans | `soyabean` |
+| Type | Products | FABLE product key(s) |
+|------|----------|----------------------|
+| Exports | Soybeans (all) | `soyabean` + `soycake` + `soyoil` (sum) |
+| Exports | Soybeans (grain) | `soyabean` |
+| Exports | Soybeans (cake) | `soycake` |
+| Exports | Soybeans (oil) | `soyoil` |
 | Exports | Corn | `corn` |
 | Exports | Beef | `beef` |
 | Imports | Wheat | `wheat` |
