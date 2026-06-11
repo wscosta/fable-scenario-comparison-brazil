@@ -256,3 +256,14 @@ No historical data is available for any trade variable — the chart shows FABLE
 | Exports | Corn | `corn` |
 | Exports | Beef | `beef` |
 | Imports | Wheat | `wheat` |
+
+## 🍽️ Shiny app — Food tab
+
+| Control | Options |
+|---------|---------|
+| **Variable** | Food Consumption |
+| **Scenario** | Both · Current Trends · NDC Commitments |
+| **Years** | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
+| **Chart type** | Line chart · Bar chart |
+
+Values are in **kcal/cap/day**. Source: `kcal_feas` column from the aggregate SCENATHON_report table. No historical data — the chart shows scenario lines only and the right panel shows a values table rounded to whole numbers.

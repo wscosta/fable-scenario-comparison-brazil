@@ -846,6 +846,106 @@ make_trade_table_data <- function(trade_type, product, scenario_sel, x_max) {
   cbind(` ` = rownames(df), df, stringsAsFactors = FALSE)
 }
 
+# ── Food configuration ────────────────────────────────────────────────────────
+# Data from df_scenarios (aggregate table). No historical series.
+food_map <- list(
+  "Food Consumption" = list(
+    fable_col = "kcal_feas",
+    y_label   = "kcal/cap/day"
+  )
+)
+
+get_food_fable <- function(variable, scenario_name, x_max) {
+  cfg <- food_map[[variable]]
+  df_scenarios %>%
+    filter(scenario == scenario_name, Year <= x_max) %>%
+    select(year = Year, value = all_of(cfg$fable_col)) %>%
+    mutate(value = as.numeric(value)) %>%
+    arrange(year)
+}
+
+calc_food_y_range <- function(variable, x_max) {
+  all_vals <- bind_rows(
+    get_food_fable(variable, "Current Trends",  x_max),
+    get_food_fable(variable, "NDC Commitments", x_max)
+  )$value
+  pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
+  c(0, max(all_vals, na.rm = TRUE) + pad)
+}
+
+# ── Food plot builders ────────────────────────────────────────────────────────
+make_food_combined_plot <- function(variable, x_max, y_range, chart_type) {
+  cfg   <- food_map[[variable]]
+  hover <- function(nm) paste0("%{x}: <b>%{y:.0f} kcal/cap/day</b><extra>", nm, "</extra>")
+  ct    <- get_food_fable(variable, "Current Trends",  x_max)
+  ndc   <- get_food_fable(variable, "NDC Commitments", x_max)
+
+  if (chart_type == "Bar chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "bar", name = "Current Trends",
+                marker = list(color = COL_CT,  line = list(color = "black", width = 1)),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
+                marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
+                hovertemplate = hover("NDC Commitments"))
+  } else {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
+                name = "Current Trends",
+                line = list(color = COL_CT,  width = 2), marker = list(color = COL_CT,  size = 7),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
+                name = "NDC Commitments",
+                line = list(color = COL_NDC, width = 2), marker = list(color = COL_NDC, size = 7),
+                hovertemplate = hover("NDC Commitments"))
+  }
+  base_layout(p, paste0(variable, ": Current Trends vs NDC Commitments"),
+              x_max = x_max, y_range = y_range, y_label = cfg$y_label,
+              barmode = if (chart_type == "Bar chart") "group" else NULL)
+}
+
+make_food_single_plot <- function(variable, scenario_name, bar_color, x_max, y_range, chart_type) {
+  cfg        <- food_map[[variable]]
+  hover_tmpl <- paste0("%{x}: <b>%{y:.0f} kcal/cap/day</b><extra>", scenario_name, "</extra>")
+  scen       <- get_food_fable(variable, scenario_name, x_max)
+
+  if (chart_type == "Bar chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
+                marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
+                name = scenario_name,
+                line = list(color = bar_color, width = 2), marker = list(color = bar_color, size = 7),
+                hovertemplate = hover_tmpl)
+  }
+  base_layout(p, paste0(variable, ": ", scenario_name),
+              bar_color, x_max = x_max, y_range = y_range, y_label = cfg$y_label,
+              barmode = if (chart_type == "Bar chart") "group" else NULL)
+}
+
+# ── Food table builder ────────────────────────────────────────────────────────
+make_food_table_data <- function(variable, scenario_sel, x_max) {
+  years <- seq(2000, x_max, 5)
+
+  pull_fable <- function(scen_name)
+    get_food_fable(variable, scen_name, x_max) %>%
+      filter(year %in% years) %>% arrange(year) %>% pull(value)
+
+  rows <- list()
+  if (scenario_sel %in% c("Both", "Current Trends"))
+    rows[["Current Trends"]] <- pull_fable("Current Trends")
+  if (scenario_sel %in% c("Both", "NDC Commitments"))
+    rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
+
+  mat <- do.call(rbind, rows)
+  df  <- as.data.frame(mat)
+  colnames(df) <- as.character(years)
+  cbind(` ` = rownames(df), df, stringsAsFactors = FALSE)
+}
+
 # ── Emissions configuration ───────────────────────────────────────────────────
 # FABLE columns are already in Mt CO2e.
 # Historical data (SEEG13) is in million tonnes of the gas → multiply by hist_gwp.
@@ -1212,10 +1312,29 @@ ui <- navbarPage(
 
   tabPanel(HTML("🍽️ Food"),
     br(),
-    div(style = "text-align: center; padding: 80px; color: #888;",
-        div(style = "font-size: 48px;", "🍽️"),
-        div(style = "font-size: 18px; margin-top: 12px;", "Under development")
-    )
+    fluidRow(
+      column(3,
+        selectInput("food_variable", "Variable:",
+                    choices  = names(food_map),
+                    selected = "Food Consumption")
+      ),
+      column(3,
+        selectInput("food_scenario", "Scenario:",
+                    choices  = c("Both", "Current Trends", "NDC Commitments"),
+                    selected = "Both")
+      ),
+      column(3,
+        selectInput("food_years", "Years:",
+                    choices  = c("Calibration & Projections", "Calibration"),
+                    selected = "Calibration & Projections")
+      ),
+      column(3,
+        selectInput("food_chart_type", "Chart type:",
+                    choices  = c("Line chart", "Bar chart"),
+                    selected = "Line chart")
+      )
+    ),
+    uiOutput("food_charts_ui")
   )
 )
 
@@ -1503,6 +1622,56 @@ server <- function(input, output, session) {
   output$trade_plot_ndc <- renderPlotly({
     make_trade_single_plot(input$trade_type, input$trade_product, "NDC Commitments",
                            COL_NDC, trade_x_max(), trade_y_range(), input$trade_chart_type)
+  })
+
+  # ── Food tab ──────────────────────────────────────────────────────────────────
+  food_x_max <- reactive({
+    if (input$food_years == "Calibration") 2020L else 2050L
+  })
+
+  food_y_range <- reactive({
+    req(input$food_variable %in% names(food_map))
+    calc_food_y_range(input$food_variable, food_x_max())
+  })
+
+  output$food_charts_ui <- renderUI({
+    req(input$food_variable %in% names(food_map))
+    y_label <- food_map[[input$food_variable]]$y_label
+
+    right_col <- tagList(
+      strong(y_label),
+      div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+          tableOutput("food_data_table"))
+    )
+
+    switch(input$food_scenario,
+      "Both"            = fluidRow(
+        column(6, plotlyOutput("food_plot_both", height = "460px")),
+        column(6, right_col)
+      ),
+      "Current Trends"  = fluidRow(
+        column(6, plotlyOutput("food_plot_ct",   height = "460px")),
+        column(6, right_col)
+      ),
+      "NDC Commitments" = fluidRow(
+        column(6, plotlyOutput("food_plot_ndc",  height = "460px")),
+        column(6, right_col)
+      )
+    )
+  })
+
+  output$food_data_table <- renderTable(
+    make_food_table_data(input$food_variable, input$food_scenario, food_x_max()),
+    digits = 0, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+  output$food_plot_both <- renderPlotly({
+    make_food_combined_plot(input$food_variable, food_x_max(), food_y_range(), input$food_chart_type)
+  })
+  output$food_plot_ct <- renderPlotly({
+    make_food_single_plot(input$food_variable, "Current Trends",  COL_CT,  food_x_max(), food_y_range(), input$food_chart_type)
+  })
+  output$food_plot_ndc <- renderPlotly({
+    make_food_single_plot(input$food_variable, "NDC Commitments", COL_NDC, food_x_max(), food_y_range(), input$food_chart_type)
   })
 
   # ── Emissions tab ─────────────────────────────────────────────────────────────
