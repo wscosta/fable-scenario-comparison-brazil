@@ -773,17 +773,22 @@ make_emiss_rel_diff_colored <- function(emiss_name, scenario_sel) {
   df
 }
 
+# ── Static assets ─────────────────────────────────────────────────────────────
+addResourcePath("images", normalizePath("data/images", mustWork = FALSE))
+
 # ── UI ────────────────────────────────────────────────────────────────────────
 ui <- navbarPage(
-  title = "FABLE-Calculator Brazil v50",
+  title = HTML('<span style="display:inline-flex; align-items:center; gap:8px;"><img src="images/fable_logo.png" height="26" style="border-radius:4px;">FABLE-Calculator Brazil v50</span>'),
+  windowTitle = "FABLE-Calculator Brazil v50",
+  header = tags$head(tags$link(rel = "icon", type = "image/svg+xml", href = "images/favicon.svg")),
 
-  tabPanel("Land-use",
+  tabPanel(HTML("🗺️ Land-use"),
     br(),
     fluidRow(
       column(3,
         selectInput("class_sel", "Landuse Class:",
                     choices  = names(landuse_map),
-                    selected = "Cropland")
+                    selected = "Forest")
       ),
       column(3,
         selectInput("scenario_sel", "Scenario:",
@@ -804,7 +809,34 @@ ui <- navbarPage(
     uiOutput("charts_ui")
   ),
 
-  tabPanel("Crops",
+  tabPanel(HTML("🌫️ Emissions"),
+    br(),
+    fluidRow(
+      column(3,
+        selectInput("emiss_sel", "Emission:",
+                    choices  = names(emissions_map),
+                    selected = "CO2 AFOLU")
+      ),
+      column(3,
+        selectInput("emiss_scenario", "Scenario:",
+                    choices  = c("Both", "Current Trends", "NDC Commitments"),
+                    selected = "Both")
+      ),
+      column(3,
+        selectInput("emiss_years", "Years:",
+                    choices  = c("Calibration & Projections", "Calibration"),
+                    selected = "Calibration & Projections")
+      ),
+      column(3,
+        selectInput("emiss_chart_type", "Chart type:",
+                    choices  = c("Line chart", "Bar chart"),
+                    selected = "Line chart")
+      )
+    ),
+    uiOutput("emiss_charts_ui")
+  ),
+
+  tabPanel(HTML("🌾 Crops"),
     br(),
     fluidRow(
       column(2,
@@ -836,31 +868,28 @@ ui <- navbarPage(
     uiOutput("crop_charts_ui")
   ),
 
-  tabPanel("Emissions",
+  tabPanel(HTML("🐄 Livestock"),
     br(),
-    fluidRow(
-      column(3,
-        selectInput("emiss_sel", "Emission:",
-                    choices  = names(emissions_map),
-                    selected = "CO2 AFOLU")
-      ),
-      column(3,
-        selectInput("emiss_scenario", "Scenario:",
-                    choices  = c("Both", "Current Trends", "NDC Commitments"),
-                    selected = "Both")
-      ),
-      column(3,
-        selectInput("emiss_years", "Years:",
-                    choices  = c("Calibration & Projections", "Calibration"),
-                    selected = "Calibration & Projections")
-      ),
-      column(3,
-        selectInput("emiss_chart_type", "Chart type:",
-                    choices  = c("Line chart", "Bar chart"),
-                    selected = "Line chart")
-      )
-    ),
-    uiOutput("emiss_charts_ui")
+    div(style = "text-align: center; padding: 80px; color: #888;",
+        div(style = "font-size: 48px;", "🐄"),
+        div(style = "font-size: 18px; margin-top: 12px;", "Under development")
+    )
+  ),
+
+  tabPanel(HTML("🚢 Trade"),
+    br(),
+    div(style = "text-align: center; padding: 80px; color: #888;",
+        div(style = "font-size: 48px;", "🚢"),
+        div(style = "font-size: 18px; margin-top: 12px;", "Under development")
+    )
+  ),
+
+  tabPanel(HTML("🍽️ Food"),
+    br(),
+    div(style = "text-align: center; padding: 80px; color: #888;",
+        div(style = "font-size: 48px;", "🍽️"),
+        div(style = "font-size: 18px; margin-top: 12px;", "Under development")
+    )
   )
 )
 

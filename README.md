@@ -11,6 +11,24 @@ The FABLE Calculator is a spreadsheet-based land-use modelling tool developed by
 | **Current Trends** | Business-as-usual trajectory |
 | **NDC Commitments** | Nationally Determined Contribution targets |
 
+## ⚙️ Requirements
+
+R (≥ 4.1) with the following packages:
+
+| Package | Purpose |
+|---------|---------|
+| `readxl` | Read FABLE Calculator Excel files |
+| `dplyr` | Data wrangling |
+| `tidyr` | Data reshaping |
+| `shiny` | Web app framework |
+| `plotly` | Interactive charts |
+
+Install all at once from the R console:
+
+```r
+install.packages(c("readxl", "dplyr", "tidyr", "shiny", "plotly"))
+```
+
 ## 📁 Repository structure
 
 ```
@@ -18,6 +36,9 @@ fable-scenario-comparison-brazil/
 ├── data/
 │   ├── csv/
 │   │   └── histdatabrazil.csv               # Historical observations (1995–2020)
+│   ├── images/
+│   │   ├── fable_logo.png                   # Navbar logo
+│   │   └── favicon.svg                      # Browser tab icon (Brazil flag)
 │   └── xlsx/
 │       ├── FABLECalculator_BRA_UP50_CurrentTrends.xlsx
 │       └── FABLECalculator_BRA_UP50_NDC.xlsx
@@ -47,12 +68,6 @@ Two tables are read from the `SCENATHON_report` sheet:
 
 - **Aggregate table** (header row 11, `skip = 10`) — one row per 5-year time step (2000–2050), wide format with land-use, emissions and other aggregate variables.
 - **Crop table** (header row 29, `skip = 28`) — long format with columns `Product`, `Year`, `ProdQ_feas` (production, 1000 t) and `FeasHarvarea` (harvested area, 1000 ha), one row per product per year.
-
-## ⚙️ Requirements
-
-```r
-install.packages(c("readxl", "dplyr", "tidyr", "shiny", "plotly"))
-```
 
 ## 🚀 Usage
 
