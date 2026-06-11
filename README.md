@@ -98,22 +98,27 @@ source("01_process_data.R")
 
 ## 🎨 UI theme
 
-The app uses **Bootstrap 5** via the `bslib` package. The navbar displays in two rows — app title on the first line and tab names on the second — against a light turquoise background (`#B8E8EE`). Interactive elements (active tabs, focused inputs, buttons) use a darker turquoise accent (`#007B8A`).
+The app uses **Bootstrap 5** via the `bslib` package. The navbar displays in two rows — app title on the first line and tab names on the second — with a turquoise background (`#007B8A`) and white text. Interactive elements (active tabs, focused inputs, buttons) use the same turquoise accent.
 
-## 📊 Shiny app — Land-use tab
+Controls are grouped in a **sidebar panel** on the left of each tab. Scenario, Years, and Chart type are shown as radio buttons; the variable selector (land-use class, emission type, crop, etc.) uses a dropdown. Sidebar labels are bold without trailing colons.
+
+## 📊 Shiny app — Land Use tab
 
 The controls are displayed in this order:
 
-| Control | Options |
-|---------|---------|
-| **Landuse Class** | Cropland · Pasture · Forest · Other Land · Urban |
-| **Scenario** | Both · Current Trends · NDC Commitments |
-| **Years** | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
-| **Chart type** | Line chart · Bar chart |
+| Control | Type | Options |
+|---------|------|---------|
+| **Landuse Class** | Dropdown | Cropland · Pasture · Forest · Other Land · Urban |
+| **Scenario** | Radio | Both · Current Trends · NDC Commitments |
+| **Years** | Radio | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
+| **Chart type** | Radio | Line chart · Bar chart |
 
 ### Layout
 
-Each view shows an interactive chart on the left and a data panel on the right, both inside the same row.
+The chart always appears on the left. The data table position depends on the Years selection:
+
+- **Calibration & Projections** — table appears below the chart at full width, so all years (2000–2050) are visible without horizontal scrolling
+- **Calibration** — table appears to the right of the chart (2000–2020 fits comfortably in the available space)
 
 ### Chart behaviour
 

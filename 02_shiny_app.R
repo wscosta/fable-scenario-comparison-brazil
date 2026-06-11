@@ -1235,184 +1235,148 @@ ui <- page_navbar(
       .tab-content {
         padding-top: 8px;
       }
+      .bslib-sidebar-layout > .sidebar {
+        font-size: 0.8rem;
+      }
+      .bslib-sidebar-layout > .sidebar .control-label {
+        font-weight: 600;
+      }
+      .selectize-input,
+      .selectize-dropdown {
+        font-size: 0.8rem !important;
+      }
     "))
   ),
   theme = bs_theme(primary = "#007B8A", version = 5),
-  bg = "#B8E8EE",
+  bg = "#007B8A",
 
-  nav_panel(HTML("🗺️ Land-use"),
-    br(),
-    fluidRow(
-      column(3,
-        selectInput("class_sel", "Landuse Class:",
+  nav_panel(HTML("🗺️ Land Use"),
+    layout_sidebar(
+      sidebar = sidebar(
+        selectInput("class_sel", "Landuse Class",
                     choices  = names(landuse_map),
-                    selected = "Forest")
-      ),
-      column(3,
-        selectInput("scenario_sel", "Scenario:",
+                    selected = "Forest"),
+        radioButtons("scenario_sel", "Scenario",
                     choices  = c("Both", "Current Trends", "NDC Commitments"),
-                    selected = "Both")
-      ),
-      column(3,
-        selectInput("years_sel", "Years:",
+                    selected = "Both"),
+        radioButtons("years_sel", "Years",
                     choices  = c("Calibration & Projections", "Calibration"),
-                    selected = "Calibration & Projections")
-      ),
-      column(3,
-        selectInput("chart_type", "Chart type:",
+                    selected = "Calibration & Projections"),
+        radioButtons("chart_type", "Chart type",
                     choices  = c("Line chart", "Bar chart"),
                     selected = "Line chart")
-      )
-    ),
-    uiOutput("charts_ui")
+      ),
+      uiOutput("charts_ui")
+    )
   ),
 
   nav_panel(HTML("🌫️ Emissions"),
-    br(),
-    fluidRow(
-      column(3,
-        selectInput("emiss_sel", "Emission:",
+    layout_sidebar(
+      sidebar = sidebar(
+        selectInput("emiss_sel", "Emission",
                     choices  = names(emissions_map),
-                    selected = "CO₂ AFOLU")
-      ),
-      column(3,
-        selectInput("emiss_scenario", "Scenario:",
+                    selected = "CO₂ AFOLU"),
+        radioButtons("emiss_scenario", "Scenario",
                     choices  = c("Both", "Current Trends", "NDC Commitments"),
-                    selected = "Both")
-      ),
-      column(3,
-        selectInput("emiss_years", "Years:",
+                    selected = "Both"),
+        radioButtons("emiss_years", "Years",
                     choices  = c("Calibration & Projections", "Calibration"),
-                    selected = "Calibration & Projections")
-      ),
-      column(3,
-        selectInput("emiss_chart_type", "Chart type:",
+                    selected = "Calibration & Projections"),
+        radioButtons("emiss_chart_type", "Chart type",
                     choices  = c("Line chart", "Bar chart"),
                     selected = "Line chart")
-      )
-    ),
-    uiOutput("emiss_charts_ui")
+      ),
+      uiOutput("emiss_charts_ui")
+    )
   ),
 
   nav_panel(HTML("🌾 Crops"),
-    br(),
-    fluidRow(
-      column(2,
-        selectInput("crop_name", "Crop:",
+    layout_sidebar(
+      sidebar = sidebar(
+        selectInput("crop_name", "Crop",
                     choices  = c("Soybeans", "Corn", "Sugarcane"),
-                    selected = "Soybeans")
-      ),
-      column(2,
-        selectInput("crop_type", "Type:",
+                    selected = "Soybeans"),
+        selectInput("crop_type", "Type",
                     choices  = c("Area", "Production", "Yield"),
-                    selected = "Area")
-      ),
-      column(2,
-        selectInput("crop_scenario", "Scenario:",
+                    selected = "Area"),
+        radioButtons("crop_scenario", "Scenario",
                     choices  = c("Both", "Current Trends", "NDC Commitments"),
-                    selected = "Both")
-      ),
-      column(3,
-        selectInput("crop_years", "Years:",
+                    selected = "Both"),
+        radioButtons("crop_years", "Years",
                     choices  = c("Calibration & Projections", "Calibration"),
-                    selected = "Calibration & Projections")
-      ),
-      column(2,
-        selectInput("crop_chart_type", "Chart type:",
+                    selected = "Calibration & Projections"),
+        radioButtons("crop_chart_type", "Chart type",
                     choices  = c("Line chart", "Bar chart"),
                     selected = "Line chart")
-      )
-    ),
-    uiOutput("crop_charts_ui")
+      ),
+      uiOutput("crop_charts_ui")
+    )
   ),
 
   nav_panel(HTML("🐄 Livestock"),
-    br(),
-    fluidRow(
-      column(3,
-        selectInput("live_product", "Variable:",
+    layout_sidebar(
+      sidebar = sidebar(
+        selectInput("live_product", "Variable",
                     choices  = c("Beef Production", "Milk Production",
                                  "Chicken Production", "Pork Production",
                                  "Cattle Herd", "Cattle Stocking Rate"),
-                    selected = "Beef Production")
-      ),
-      column(3,
-        selectInput("live_scenario", "Scenario:",
+                    selected = "Beef Production"),
+        radioButtons("live_scenario", "Scenario",
                     choices  = c("Both", "Current Trends", "NDC Commitments"),
-                    selected = "Both")
-      ),
-      column(3,
-        selectInput("live_years", "Years:",
+                    selected = "Both"),
+        radioButtons("live_years", "Years",
                     choices  = c("Calibration & Projections", "Calibration"),
-                    selected = "Calibration & Projections")
-      ),
-      column(3,
-        selectInput("live_chart_type", "Chart type:",
+                    selected = "Calibration & Projections"),
+        radioButtons("live_chart_type", "Chart type",
                     choices  = c("Line chart", "Bar chart"),
                     selected = "Line chart")
-      )
-    ),
-    uiOutput("live_charts_ui")
+      ),
+      uiOutput("live_charts_ui")
+    )
   ),
 
   nav_panel(HTML("🚢 Trade"),
-    br(),
-    fluidRow(
-      column(2,
-        selectInput("trade_type", "Type:",
+    layout_sidebar(
+      sidebar = sidebar(
+        selectInput("trade_type", "Type",
                     choices  = c("Exports", "Imports"),
-                    selected = "Exports")
-      ),
-      column(2,
-        selectInput("trade_product", "Product:",
+                    selected = "Exports"),
+        selectInput("trade_product", "Product",
                     choices  = c("Soybeans (all)", "Soybeans (grain)", "Soybeans (cake)",
                                  "Soybeans (oil)", "Corn", "Beef"),
-                    selected = "Soybeans (all)")
-      ),
-      column(2,
-        selectInput("trade_scenario", "Scenario:",
+                    selected = "Soybeans (all)"),
+        radioButtons("trade_scenario", "Scenario",
                     choices  = c("Both", "Current Trends", "NDC Commitments"),
-                    selected = "Both")
-      ),
-      column(3,
-        selectInput("trade_years", "Years:",
+                    selected = "Both"),
+        radioButtons("trade_years", "Years",
                     choices  = c("Calibration & Projections", "Calibration"),
-                    selected = "Calibration & Projections")
-      ),
-      column(3,
-        selectInput("trade_chart_type", "Chart type:",
+                    selected = "Calibration & Projections"),
+        radioButtons("trade_chart_type", "Chart type",
                     choices  = c("Line chart", "Bar chart"),
                     selected = "Line chart")
-      )
-    ),
-    uiOutput("trade_charts_ui")
+      ),
+      uiOutput("trade_charts_ui")
+    )
   ),
 
   nav_panel(HTML("🍽️ Food"),
-    br(),
-    fluidRow(
-      column(3,
-        selectInput("food_variable", "Variable:",
+    layout_sidebar(
+      sidebar = sidebar(
+        selectInput("food_variable", "Variable",
                     choices  = names(food_map),
-                    selected = "Food Consumption")
-      ),
-      column(3,
-        selectInput("food_scenario", "Scenario:",
+                    selected = "Food Consumption"),
+        radioButtons("food_scenario", "Scenario",
                     choices  = c("Both", "Current Trends", "NDC Commitments"),
-                    selected = "Both")
-      ),
-      column(3,
-        selectInput("food_years", "Years:",
+                    selected = "Both"),
+        radioButtons("food_years", "Years",
                     choices  = c("Calibration & Projections", "Calibration"),
-                    selected = "Calibration & Projections")
-      ),
-      column(3,
-        selectInput("food_chart_type", "Chart type:",
+                    selected = "Calibration & Projections"),
+        radioButtons("food_chart_type", "Chart type",
                     choices  = c("Line chart", "Bar chart"),
                     selected = "Line chart")
-      )
-    ),
-    uiOutput("food_charts_ui")
+      ),
+      uiOutput("food_charts_ui")
+    )
   )
 )
 
@@ -1456,20 +1420,19 @@ server <- function(input, output, session) {
       )
     }
 
-    switch(input$scenario_sel,
-      "Both"            = fluidRow(
-        column(6, plotlyOutput("plot_both", height = "460px")),
-        column(6, right_col)
-      ),
-      "Current Trends"  = fluidRow(
-        column(6, plotlyOutput("plot_ct",   height = "460px")),
-        column(6, right_col)
-      ),
-      "NDC Commitments" = fluidRow(
-        column(6, plotlyOutput("plot_ndc",  height = "460px")),
-        column(6, right_col)
-      )
+    chart_out <- switch(input$scenario_sel,
+      "Both"            = plotlyOutput("plot_both", height = "460px"),
+      "Current Trends"  = plotlyOutput("plot_ct",   height = "460px"),
+      "NDC Commitments" = plotlyOutput("plot_ndc",  height = "460px")
     )
+    if (x_max() == 2050) {
+      tagList(
+        fluidRow(column(6, chart_out)),
+        fluidRow(column(12, right_col))
+      )
+    } else {
+      fluidRow(column(6, chart_out), column(6, right_col))
+    }
   })
 
   output$data_table <- renderTable(
@@ -1551,20 +1514,19 @@ server <- function(input, output, session) {
       )
     }
 
-    switch(input$crop_scenario,
-      "Both"            = fluidRow(
-        column(6, plotlyOutput("crop_plot_both", height = "460px")),
-        column(6, right_col)
-      ),
-      "Current Trends"  = fluidRow(
-        column(6, plotlyOutput("crop_plot_ct",   height = "460px")),
-        column(6, right_col)
-      ),
-      "NDC Commitments" = fluidRow(
-        column(6, plotlyOutput("crop_plot_ndc",  height = "460px")),
-        column(6, right_col)
-      )
+    chart_out <- switch(input$crop_scenario,
+      "Both"            = plotlyOutput("crop_plot_both", height = "460px"),
+      "Current Trends"  = plotlyOutput("crop_plot_ct",   height = "460px"),
+      "NDC Commitments" = plotlyOutput("crop_plot_ndc",  height = "460px")
     )
+    if (crop_x_max() == 2050) {
+      tagList(
+        fluidRow(column(6, chart_out)),
+        fluidRow(column(12, right_col))
+      )
+    } else {
+      fluidRow(column(6, chart_out), column(6, right_col))
+    }
   })
 
   output$crop_data_table <- renderTable(
@@ -1644,20 +1606,19 @@ server <- function(input, output, session) {
       )
     }
 
-    switch(input$live_scenario,
-      "Both"            = fluidRow(
-        column(6, plotlyOutput("live_plot_both", height = "460px")),
-        column(6, right_col)
-      ),
-      "Current Trends"  = fluidRow(
-        column(6, plotlyOutput("live_plot_ct",   height = "460px")),
-        column(6, right_col)
-      ),
-      "NDC Commitments" = fluidRow(
-        column(6, plotlyOutput("live_plot_ndc",  height = "460px")),
-        column(6, right_col)
-      )
+    chart_out <- switch(input$live_scenario,
+      "Both"            = plotlyOutput("live_plot_both", height = "460px"),
+      "Current Trends"  = plotlyOutput("live_plot_ct",   height = "460px"),
+      "NDC Commitments" = plotlyOutput("live_plot_ndc",  height = "460px")
     )
+    if (live_x_max() == 2050) {
+      tagList(
+        fluidRow(column(6, chart_out)),
+        fluidRow(column(12, right_col))
+      )
+    } else {
+      fluidRow(column(6, chart_out), column(6, right_col))
+    }
   })
 
   output$live_data_table <- renderTable(
@@ -1724,20 +1685,19 @@ server <- function(input, output, session) {
           tableOutput("trade_data_table"))
     )
 
-    switch(input$trade_scenario,
-      "Both"            = fluidRow(
-        column(6, plotlyOutput("trade_plot_both", height = "460px")),
-        column(6, right_col)
-      ),
-      "Current Trends"  = fluidRow(
-        column(6, plotlyOutput("trade_plot_ct",   height = "460px")),
-        column(6, right_col)
-      ),
-      "NDC Commitments" = fluidRow(
-        column(6, plotlyOutput("trade_plot_ndc",  height = "460px")),
-        column(6, right_col)
-      )
+    chart_out <- switch(input$trade_scenario,
+      "Both"            = plotlyOutput("trade_plot_both", height = "460px"),
+      "Current Trends"  = plotlyOutput("trade_plot_ct",   height = "460px"),
+      "NDC Commitments" = plotlyOutput("trade_plot_ndc",  height = "460px")
     )
+    if (trade_x_max() == 2050) {
+      tagList(
+        fluidRow(column(6, chart_out)),
+        fluidRow(column(12, right_col))
+      )
+    } else {
+      fluidRow(column(6, chart_out), column(6, right_col))
+    }
   })
 
   output$trade_data_table <- renderTable(
@@ -1793,20 +1753,19 @@ server <- function(input, output, session) {
           tableOutput("food_data_table"))
     )
 
-    switch(input$food_scenario,
-      "Both"            = fluidRow(
-        column(6, plotlyOutput("food_plot_both", height = "460px")),
-        column(6, right_col)
-      ),
-      "Current Trends"  = fluidRow(
-        column(6, plotlyOutput("food_plot_ct",   height = "460px")),
-        column(6, right_col)
-      ),
-      "NDC Commitments" = fluidRow(
-        column(6, plotlyOutput("food_plot_ndc",  height = "460px")),
-        column(6, right_col)
-      )
+    chart_out <- switch(input$food_scenario,
+      "Both"            = plotlyOutput("food_plot_both", height = "460px"),
+      "Current Trends"  = plotlyOutput("food_plot_ct",   height = "460px"),
+      "NDC Commitments" = plotlyOutput("food_plot_ndc",  height = "460px")
     )
+    if (food_x_max() == 2050) {
+      tagList(
+        fluidRow(column(6, chart_out)),
+        fluidRow(column(12, right_col))
+      )
+    } else {
+      fluidRow(column(6, chart_out), column(6, right_col))
+    }
   })
 
   output$food_data_table <- renderTable(
@@ -1873,20 +1832,19 @@ server <- function(input, output, session) {
       )
     }
 
-    switch(input$emiss_scenario,
-      "Both"            = fluidRow(
-        column(6, plotlyOutput("emiss_plot_both", height = "460px")),
-        column(6, right_col)
-      ),
-      "Current Trends"  = fluidRow(
-        column(6, plotlyOutput("emiss_plot_ct",   height = "460px")),
-        column(6, right_col)
-      ),
-      "NDC Commitments" = fluidRow(
-        column(6, plotlyOutput("emiss_plot_ndc",  height = "460px")),
-        column(6, right_col)
-      )
+    chart_out <- switch(input$emiss_scenario,
+      "Both"            = plotlyOutput("emiss_plot_both", height = "460px"),
+      "Current Trends"  = plotlyOutput("emiss_plot_ct",   height = "460px"),
+      "NDC Commitments" = plotlyOutput("emiss_plot_ndc",  height = "460px")
     )
+    if (emiss_x_max() == 2050) {
+      tagList(
+        fluidRow(column(6, chart_out)),
+        fluidRow(column(12, right_col))
+      )
+    } else {
+      fluidRow(column(6, chart_out), column(6, right_col))
+    }
   })
 
   output$emiss_data_table <- renderTable(
