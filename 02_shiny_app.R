@@ -893,7 +893,7 @@ make_trade_table_data <- function(trade_type, product, scenario_sel, x_max) {
 food_map <- list(
   "Food Consumption" = list(
     fable_col = "kcal_feas",
-    y_label   = "kcal/cap/day"
+    y_label   = "Intake (kcal/cap/day)"
   )
 )
 
@@ -918,7 +918,7 @@ calc_food_y_range <- function(variable, x_max) {
 # ── Food plot builders ────────────────────────────────────────────────────────
 make_food_combined_plot <- function(variable, x_max, y_range, chart_type) {
   cfg   <- food_map[[variable]]
-  hover <- function(nm) paste0("%{x}: <b>%{y:.0f} kcal/cap/day</b><extra>", nm, "</extra>")
+  hover <- function(nm) paste0("%{x}: <b>%{y:.0f} Intake (kcal/cap/day)</b><extra>", nm, "</extra>")
   ct    <- get_food_fable(variable, "Current Trends",  x_max)
   ndc   <- get_food_fable(variable, "NDC Commitments", x_max)
 
@@ -948,7 +948,7 @@ make_food_combined_plot <- function(variable, x_max, y_range, chart_type) {
 
 make_food_single_plot <- function(variable, scenario_name, bar_color, x_max, y_range, chart_type) {
   cfg        <- food_map[[variable]]
-  hover_tmpl <- paste0("%{x}: <b>%{y:.0f} kcal/cap/day</b><extra>", scenario_name, "</extra>")
+  hover_tmpl <- paste0("%{x}: <b>%{y:.0f} Intake (kcal/cap/day)</b><extra>", scenario_name, "</extra>")
   scen       <- get_food_fable(variable, scenario_name, x_max)
 
   if (chart_type == "Bar chart") {
@@ -993,29 +993,29 @@ make_food_table_data <- function(variable, scenario_sel, x_max) {
 # Historical data (SEEG13) is in million tonnes of the gas → multiply by hist_gwp.
 # GWP: CH4 = 27.2, N2O = 273, CO2 = 1.
 emissions_map <- list(
-  "CO2 AFOLU" = list(
+  "CO₂ AFOLU" = list(
     fable_col   = "CalcAllLandCO2e",
     hist_type   = "CO2 AFOLU",
     hist_source = "SEEG13",
     hist_gwp    = 1,
     year_min    = 2005L,
-    y_label     = "Emissions (MtCO2e)"
+    y_label     = "Emissions (MtCO₂e)"
   ),
-  "CH4 Enteric Fermentation" = list(
+  "CH₄ Enteric Fermentation" = list(
     fable_col   = "CalcLiveCH4",
     hist_type   = "CH4 Enteric Fermentation",
     hist_source = "SEEG13",
     hist_gwp    = 27.2,
-    y_label     = "Emissions (MtCO2e)"
+    y_label     = "Emissions (MtCO₂e)"
   ),
-  "CH4 Rice" = list(
+  "CH₄ Rice" = list(
     fable_col   = "CalcCropCH4",
     hist_type   = "CH4 Rice",
     hist_source = "SEEG13",
     hist_gwp    = 27.2,
-    y_label     = "Emissions (MtCO2e)"
+    y_label     = "Emissions (MtCO₂e)"
   ),
-  "N2O from Agriculture" = list(
+  "N₂O from Agriculture" = list(
     fable_cols  = c("CalcLiveN2O", "CalcCropN2O"),
     hist_types  = c("N2O Animal Waste Management", "N2O Burning of Crop Residues",
                     "N2O Decay of Crop Residues",  "N2O Inorganic Fertilizers",
@@ -1023,7 +1023,7 @@ emissions_map <- list(
                     "N2O Peatland", "N2O Soil Organic Matter Loss"),
     hist_source = "SEEG13",
     hist_gwp    = 273,
-    y_label     = "Emissions (MtCO2e)"
+    y_label     = "Emissions (MtCO₂e)"
   )
 )
 emissions_map <- Filter(function(cfg) {
@@ -1077,7 +1077,7 @@ make_emiss_combined_plot <- function(emiss_name, x_max, y_range, chart_type) {
   ct        <- get_emiss_fable(emiss_name, "Current Trends",  x_max)
   ndc       <- get_emiss_fable(emiss_name, "NDC Commitments", x_max)
   hist_data <- get_emiss_hist(emiss_name, x_max)
-  hover     <- function(nm) paste0("%{x}: <b>%{y:.2f} MtCO2e</b><extra>", nm, "</extra>")
+  hover     <- function(nm) paste0("%{x}: <b>%{y:.2f} MtCO₂e</b><extra>", nm, "</extra>")
 
   if (chart_type == "Bar chart") {
     p <- plot_ly() %>%
@@ -1098,20 +1098,20 @@ make_emiss_combined_plot <- function(emiss_name, x_max, y_range, chart_type) {
                 line = list(color = COL_NDC, width = 2), marker = list(color = COL_NDC, size = 7),
                 hovertemplate = hover("NDC Commitments"))
   }
-  p <- p %>% add_hist_trace(hist_data, "SEEG13", chart_type, "MtCO2e")
+  p <- p %>% add_hist_trace(hist_data, "SEEG13", chart_type, "MtCO₂e")
   year_min <- if (!is.null(cfg$year_min)) cfg$year_min else 2000L
   base_layout(p, paste0(emiss_name, ": Current Trends vs NDC Commitments"),
               x_max = x_max, y_range = y_range, y_label = cfg$y_label,
               barmode = if (chart_type == "Bar chart") "group" else NULL,
               x_min = year_min,
-              zero_line = emiss_name == "CO2 AFOLU")
+              zero_line = emiss_name == "CO₂ AFOLU")
 }
 
 make_emiss_single_plot <- function(emiss_name, scenario_name, bar_color, x_max, y_range, chart_type) {
   cfg        <- emissions_map[[emiss_name]]
   scen       <- get_emiss_fable(emiss_name, scenario_name, x_max)
   hist_data  <- get_emiss_hist(emiss_name, x_max)
-  hover_tmpl <- paste0("%{x}: <b>%{y:.2f} MtCO2e</b><extra>", scenario_name, "</extra>")
+  hover_tmpl <- paste0("%{x}: <b>%{y:.2f} MtCO₂e</b><extra>", scenario_name, "</extra>")
 
   if (chart_type == "Bar chart") {
     p <- plot_ly() %>%
@@ -1125,13 +1125,13 @@ make_emiss_single_plot <- function(emiss_name, scenario_name, bar_color, x_max, 
                 line = list(color = bar_color, width = 2), marker = list(color = bar_color, size = 7),
                 hovertemplate = hover_tmpl)
   }
-  p <- p %>% add_hist_trace(hist_data, "SEEG13", chart_type, "MtCO2e")
+  p <- p %>% add_hist_trace(hist_data, "SEEG13", chart_type, "MtCO₂e")
   year_min <- if (!is.null(cfg$year_min)) cfg$year_min else 2000L
   base_layout(p, paste0(emiss_name, ": ", scenario_name),
               bar_color, x_max = x_max, y_range = y_range, y_label = cfg$y_label,
               barmode = if (chart_type == "Bar chart") "group" else NULL,
               x_min = year_min,
-              zero_line = emiss_name == "CO2 AFOLU")
+              zero_line = emiss_name == "CO₂ AFOLU")
 }
 
 make_emiss_table_data <- function(emiss_name, scenario_sel, x_max) {
@@ -1243,7 +1243,7 @@ ui <- navbarPage(
       column(3,
         selectInput("emiss_sel", "Emission:",
                     choices  = names(emissions_map),
-                    selected = "CO2 AFOLU")
+                    selected = "CO₂ AFOLU")
       ),
       column(3,
         selectInput("emiss_scenario", "Scenario:",
@@ -1402,7 +1402,10 @@ server <- function(input, output, session) {
 
     right_col <- if (input$years_sel == "Calibration") {
       tagList(
-        strong(y_label),
+        div(style = "display:flex; align-items:center; gap:8px;",
+            strong(y_label),
+            downloadButton("landuse_dl", "CSV",
+                           style = "padding:2px 8px; font-size:11px; height:24px; line-height:20px;")),
         div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
             tableOutput("data_table")),
         strong("Absolute Difference (Mha)"),
@@ -1414,7 +1417,10 @@ server <- function(input, output, session) {
       )
     } else {
       tagList(
-        strong(y_label),
+        div(style = "display:flex; align-items:center; gap:8px;",
+            strong(y_label),
+            downloadButton("landuse_dl", "CSV",
+                           style = "padding:2px 8px; font-size:11px; height:24px; line-height:20px;")),
         div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
             tableOutput("data_table"))
       )
@@ -1451,6 +1457,17 @@ server <- function(input, output, session) {
     sanitize.text.function = identity,
     na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
+  output$landuse_dl <- downloadHandler(
+    filename = function() {
+      nm <- gsub(" ", "_", input$class_sel)
+      sc <- gsub(" ", "_", input$scenario_sel)
+      paste0("landuse_", nm, "_", sc, "_", x_max(), ".csv")
+    },
+    content = function(file) {
+      write.csv(make_table_data(input$class_sel, input$scenario_sel, x_max()),
+                file, row.names = FALSE)
+    }
+  )
 
   output$plot_both <- renderPlotly({
     make_combined_plot(input$class_sel, x_max(), y_range(), input$chart_type)
@@ -1480,7 +1497,10 @@ server <- function(input, output, session) {
 
     right_col <- if (input$crop_years == "Calibration") {
       tagList(
-        strong(y_label),
+        div(style = "display:flex; align-items:center; gap:8px;",
+            strong(y_label),
+            downloadButton("crop_dl", "CSV",
+                           style = "padding:2px 8px; font-size:11px; height:24px; line-height:20px;")),
         div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
             tableOutput("crop_data_table")),
         strong(abs_title),
@@ -1492,7 +1512,10 @@ server <- function(input, output, session) {
       )
     } else {
       tagList(
-        strong(y_label),
+        div(style = "display:flex; align-items:center; gap:8px;",
+            strong(y_label),
+            downloadButton("crop_dl", "CSV",
+                           style = "padding:2px 8px; font-size:11px; height:24px; line-height:20px;")),
         div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
             tableOutput("crop_data_table"))
       )
@@ -1527,6 +1550,18 @@ server <- function(input, output, session) {
     sanitize.text.function = identity,
     na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
+  output$crop_dl <- downloadHandler(
+    filename = function() {
+      paste0("crops_", gsub(" ", "_", input$crop_name), "_",
+             input$crop_type, "_", gsub(" ", "_", input$crop_scenario), "_",
+             crop_x_max(), ".csv")
+    },
+    content = function(file) {
+      write.csv(make_crop_table_data(input$crop_name, input$crop_type,
+                                     input$crop_scenario, crop_x_max()),
+                file, row.names = FALSE)
+    }
+  )
   output$crop_plot_both <- renderPlotly({
     make_crop_combined_plot(input$crop_name, input$crop_type, crop_x_max(), crop_y_range(), input$crop_chart_type)
   })
@@ -1555,7 +1590,10 @@ server <- function(input, output, session) {
     unit_lbl  <- livestock_map[[input$live_product]]$unit_label
     right_col <- if (input$live_years == "Calibration" && has_hist) {
       tagList(
-        strong(y_lbl),
+        div(style = "display:flex; align-items:center; gap:8px;",
+            strong(y_lbl),
+            downloadButton("live_dl", "CSV",
+                           style = "padding:2px 8px; font-size:11px; height:24px; line-height:20px;")),
         div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
             tableOutput("live_data_table")),
         strong(paste0("Absolute Difference (", unit_lbl, ")")),
@@ -1567,7 +1605,10 @@ server <- function(input, output, session) {
       )
     } else {
       tagList(
-        strong(y_lbl),
+        div(style = "display:flex; align-items:center; gap:8px;",
+            strong(y_lbl),
+            downloadButton("live_dl", "CSV",
+                           style = "padding:2px 8px; font-size:11px; height:24px; line-height:20px;")),
         div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
             tableOutput("live_data_table"))
       )
@@ -1602,6 +1643,16 @@ server <- function(input, output, session) {
     sanitize.text.function = identity,
     na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
+  output$live_dl <- downloadHandler(
+    filename = function() {
+      paste0("livestock_", gsub(" ", "_", input$live_product), "_",
+             gsub(" ", "_", input$live_scenario), "_", live_x_max(), ".csv")
+    },
+    content = function(file) {
+      write.csv(make_live_table_data(input$live_product, input$live_scenario, live_x_max()),
+                file, row.names = FALSE)
+    }
+  )
   output$live_plot_both <- renderPlotly({
     make_live_combined_plot(input$live_product, live_x_max(), live_y_range(), input$live_chart_type)
   })
@@ -1635,7 +1686,10 @@ server <- function(input, output, session) {
         input$trade_product %in% trade_map[[input$trade_type]]$products)
 
     right_col <- tagList(
-      strong(paste0(input$trade_type, " (Mt)")),
+      div(style = "display:flex; align-items:center; gap:8px;",
+          strong(paste0(input$trade_type, " (Mt)")),
+          downloadButton("trade_dl", "CSV",
+                         style = "padding:2px 8px; font-size:11px; height:24px; line-height:20px;")),
       div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
           tableOutput("trade_data_table"))
     )
@@ -1660,6 +1714,18 @@ server <- function(input, output, session) {
     make_trade_table_data(input$trade_type, input$trade_product,
                           input$trade_scenario, trade_x_max()),
     digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+  output$trade_dl <- downloadHandler(
+    filename = function() {
+      prod <- gsub("[() ]", "_", input$trade_product)
+      paste0("trade_", input$trade_type, "_", prod, "_",
+             gsub(" ", "_", input$trade_scenario), "_", trade_x_max(), ".csv")
+    },
+    content = function(file) {
+      write.csv(make_trade_table_data(input$trade_type, input$trade_product,
+                                      input$trade_scenario, trade_x_max()),
+                file, row.names = FALSE)
+    }
   )
   output$trade_plot_both <- renderPlotly({
     make_trade_combined_plot(input$trade_type, input$trade_product,
@@ -1689,7 +1755,10 @@ server <- function(input, output, session) {
     y_label <- food_map[[input$food_variable]]$y_label
 
     right_col <- tagList(
-      strong(y_label),
+      div(style = "display:flex; align-items:center; gap:8px;",
+          strong(y_label),
+          downloadButton("food_dl", "CSV",
+                         style = "padding:2px 8px; font-size:11px; height:24px; line-height:20px;")),
       div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
           tableOutput("food_data_table"))
     )
@@ -1713,6 +1782,16 @@ server <- function(input, output, session) {
   output$food_data_table <- renderTable(
     make_food_table_data(input$food_variable, input$food_scenario, food_x_max()),
     digits = 0, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+  output$food_dl <- downloadHandler(
+    filename = function() {
+      paste0("food_", gsub(" ", "_", input$food_variable), "_",
+             gsub(" ", "_", input$food_scenario), "_", food_x_max(), ".csv")
+    },
+    content = function(file) {
+      write.csv(make_food_table_data(input$food_variable, input$food_scenario, food_x_max()),
+                file, row.names = FALSE)
+    }
   )
   output$food_plot_both <- renderPlotly({
     make_food_combined_plot(input$food_variable, food_x_max(), food_y_range(), input$food_chart_type)
@@ -1740,10 +1819,13 @@ server <- function(input, output, session) {
 
     right_col <- if (input$emiss_years == "Calibration") {
       tagList(
-        strong(y_label),
+        div(style = "display:flex; align-items:center; gap:8px;",
+            strong(y_label),
+            downloadButton("emiss_dl", "CSV",
+                           style = "padding:2px 8px; font-size:11px; height:24px; line-height:20px;")),
         div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
             tableOutput("emiss_data_table")),
-        strong("Absolute Difference (MtCO2e)"),
+        strong("Absolute Difference (MtCO₂e)"),
         div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
             tableOutput("emiss_abs_diff_table")),
         strong("Relative Difference (%)"),
@@ -1752,7 +1834,10 @@ server <- function(input, output, session) {
       )
     } else {
       tagList(
-        strong(y_label),
+        div(style = "display:flex; align-items:center; gap:8px;",
+            strong(y_label),
+            downloadButton("emiss_dl", "CSV",
+                           style = "padding:2px 8px; font-size:11px; height:24px; line-height:20px;")),
         div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
             tableOutput("emiss_data_table"))
       )
@@ -1786,6 +1871,17 @@ server <- function(input, output, session) {
     make_emiss_rel_diff_colored(input$emiss_sel, input$emiss_scenario),
     sanitize.text.function = identity,
     na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+  output$emiss_dl <- downloadHandler(
+    filename = function() {
+      nm <- gsub(" ", "_", input$emiss_sel)
+      sc <- gsub(" ", "_", input$emiss_scenario)
+      paste0("emissions_", nm, "_", sc, "_", emiss_x_max(), ".csv")
+    },
+    content = function(file) {
+      write.csv(make_emiss_table_data(input$emiss_sel, input$emiss_scenario, emiss_x_max()),
+                file, row.names = FALSE)
+    }
   )
   output$emiss_plot_both <- renderPlotly({
     make_emiss_combined_plot(input$emiss_sel, emiss_x_max(), emiss_y_range(), input$emiss_chart_type)

@@ -69,6 +69,10 @@ Two tables are read from the `SCENATHON_report` sheet:
 - **Aggregate table** (header row 11, `skip = 10`) — one row per 5-year time step (2000–2050), wide format with land-use, emissions and other aggregate variables.
 - **Crop table** (header row 29, `skip = 28`) — long format with columns `Product`, `Year`, `ProdQ_feas` (production, 1000 t) and `FeasHarvarea` (harvested area, 1000 ha), one row per product per year.
 
+## 📥 Downloading data
+
+Every tab has a **CSV** button next to the values table header. Clicking it downloads the currently displayed table (selected variable, scenario, and year range) as a `.csv` file. The filename encodes the current selection, e.g. `landuse_Forest_Both_2050.csv`.
+
 ## 🚀 Usage
 
 **Terminal (one command)**
@@ -188,10 +192,10 @@ All values are in **MtCO2e**. Historical data from SEEG v13 is reported in milli
 
 | Emission | FABLE Calculator | Historical (SEEG v13) | Conversion |
 |----------|------------------|-----------------------|------------|
-| **CO2 AFOLU** | `CalcAllLandCO2e` | `CO2 AFOLU` | × 1 (already CO2e) |
-| **CH4 Enteric Fermentation** | `CalcLiveCH4` | `CH4 Enteric Fermentation` | × 27.2 (GWP100 AR6) |
-| **CH4 Rice** | `CalcCropCH4` | `CH4 Rice` | × 27.2 (GWP100 AR6) |
-| **N2O from Agriculture** | `CalcLiveN2O` + `CalcCropN2O` | Sum of 8 subcategories (see below) | × 273 (GWP100 AR6) |
+| **CO₂ AFOLU** | `CalcAllLandCO2e` | `CO2 AFOLU` | × 1 (already CO2e) |
+| **CH₄ Enteric Fermentation** | `CalcLiveCH4` | `CH4 Enteric Fermentation` | × 27.2 (GWP100 AR6) |
+| **CH₄ Rice** | `CalcCropCH4` | `CH4 Rice` | × 27.2 (GWP100 AR6) |
+| **N₂O from Agriculture** | `CalcLiveN2O` + `CalcCropN2O` | Sum of 8 subcategories (see below) | × 273 (GWP100 AR6) |
 
 #### N2O from Agriculture — aggregation
 
