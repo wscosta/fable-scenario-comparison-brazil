@@ -1,6 +1,6 @@
 library(shiny)
-library(dplyr)
-library(plotly)
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(plotly))
 
 # Run 01_process_data.R first if any processed file is missing
 if (!file.exists("data/processed/df_scenarios.rds") ||
@@ -49,13 +49,6 @@ landuse_map <- list(
 fable_cols  <- names(df_scenarios)
 landuse_map <- Filter(function(cfg) cfg$fable_col %in% fable_cols, landuse_map)
 
-# Print detected units for all classes (useful for debugging)
-message("── Land-use class units ──────────────────────────────────────")
-for (nm in names(landuse_map)) {
-  col <- landuse_map[[nm]]$fable_col
-  message(sprintf("  %-12s  col=%-15s  unit=%s", nm, col, fable_units[col]))
-}
-
 # Helper: historical data for a class (empty tibble if not found)
 get_hist <- function(class_name, x_max) {
   cfg <- landuse_map[[class_name]]
@@ -74,7 +67,8 @@ COL_NDC  <- "#009C3B"
 
 # ── Shared layout helper ──────────────────────────────────────────────────────
 base_layout <- function(p, title_text, title_color = "black", x_max, y_range,
-                        y_label = "Area (Mha)", barmode = NULL, x_min = 2000L) {
+                        y_label = "Area (Mha)", barmode = NULL, x_min = 2000L,
+                        zero_line = FALSE) {
   is_bar  <- !is.null(barmode)
   x_range <- if (is_bar) c(x_min - 4, x_max + 4) else c(x_min - 1, x_max + 1)
 
@@ -89,6 +83,14 @@ base_layout <- function(p, title_text, title_color = "black", x_max, y_range,
       list(list(type = "line",
                 x0 = 2020, x1 = 2020, yref = "paper", y0 = 0, y1 = 1,
                 line = list(color = "grey", dash = "dash", width = 1.5))),
+      shapes
+    )
+  }
+  if (zero_line) {
+    shapes <- c(
+      list(list(type = "line",
+                xref = "paper", yref = "y", x0 = 0, x1 = 1, y0 = 0, y1 = 0,
+                line = list(color = "grey", dash = "dash", width = 1))),
       shapes
     )
   }
@@ -1037,7 +1039,8 @@ calc_emiss_y_range <- function(emiss_name, x_max) {
   hist_vals <- get_emiss_hist(emiss_name, x_max)$value
   all_vals  <- c(scen_vals, hist_vals)
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
-  c(0, max(all_vals, na.rm = TRUE) + pad)
+  y_min <- min(all_vals, na.rm = TRUE)
+  c(if (y_min < 0) y_min - pad else 0, max(all_vals, na.rm = TRUE) + pad)
 }
 
 make_emiss_combined_plot <- function(emiss_name, x_max, y_range, chart_type) {
@@ -1071,7 +1074,8 @@ make_emiss_combined_plot <- function(emiss_name, x_max, y_range, chart_type) {
   base_layout(p, paste0(emiss_name, ": Current Trends vs NDC Commitments"),
               x_max = x_max, y_range = y_range, y_label = cfg$y_label,
               barmode = if (chart_type == "Bar chart") "group" else NULL,
-              x_min = year_min)
+              x_min = year_min,
+              zero_line = emiss_name == "CO2 AFOLU")
 }
 
 make_emiss_single_plot <- function(emiss_name, scenario_name, bar_color, x_max, y_range, chart_type) {
@@ -1097,7 +1101,8 @@ make_emiss_single_plot <- function(emiss_name, scenario_name, bar_color, x_max, 
   base_layout(p, paste0(emiss_name, ": ", scenario_name),
               bar_color, x_max = x_max, y_range = y_range, y_label = cfg$y_label,
               barmode = if (chart_type == "Bar chart") "group" else NULL,
-              x_min = year_min)
+              x_min = year_min,
+              zero_line = emiss_name == "CO2 AFOLU")
 }
 
 make_emiss_table_data <- function(emiss_name, scenario_sel, x_max) {

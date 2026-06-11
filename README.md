@@ -208,9 +208,11 @@ The historical series aggregates the following SEEG v13 subcategories and multip
 - N2O Peatland
 - N2O Soil Organic Matter Loss
 
-#### Note on CO2 AFOLU time range
+#### Note on CO2 AFOLU time range and negative values
 
 Charts and tables for **CO2 AFOLU start at 2005** (not 2000). The Calculator reports a value of 0 for the year 2000 in this column, which reflects a model calibration boundary rather than an observed or projected emission, so that data point is suppressed.
+
+CO2 AFOLU values can go negative (net carbon sink). When they do, the y-axis extends below zero and a dashed horizontal line is drawn at y = 0 for reference. This zero line is shown only on the CO2 AFOLU chart.
 
 ## 🐄 Shiny app — Livestock tab
 
