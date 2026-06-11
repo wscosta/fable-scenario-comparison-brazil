@@ -74,9 +74,9 @@ COL_NDC  <- "#009C3B"
 
 # ── Shared layout helper ──────────────────────────────────────────────────────
 base_layout <- function(p, title_text, title_color = "black", x_max, y_range,
-                        y_label = "Area (Mha)", barmode = NULL) {
+                        y_label = "Area (Mha)", barmode = NULL, x_min = 2000L) {
   is_bar  <- !is.null(barmode)
-  x_range <- if (is_bar) c(1996, x_max + 4) else c(1999, x_max + 1)
+  x_range <- if (is_bar) c(x_min - 4, x_max + 4) else c(x_min - 1, x_max + 1)
 
   shapes <- list(
     list(type = "rect",
@@ -98,7 +98,7 @@ base_layout <- function(p, title_text, title_color = "black", x_max, y_range,
                  font = list(color = title_color, size = 15)),
     xaxis = list(
       title     = "",
-      tickvals  = seq(2000, x_max, 5),
+      tickvals  = seq(x_min, x_max, 5),
       tickangle = 0,
       range     = x_range,
       ticks     = "outside", ticklen = 6, tickcolor = "white",
@@ -563,9 +563,219 @@ make_crop_rel_diff_colored <- function(crop_name, type_sel, scenario_sel) {
   df
 }
 
+# ── Emissions configuration ───────────────────────────────────────────────────
+# FABLE columns are already in Mt CO2e.
+# Historical data (SEEG13) is in million tonnes of the gas → multiply by hist_gwp.
+# GWP: CH4 = 27.2, N2O = 273, CO2 = 1.
+emissions_map <- list(
+  "CO2 AFOLU" = list(
+    fable_col   = "CalcAllLandCO2e",
+    hist_type   = "CO2 AFOLU",
+    hist_source = "SEEG13",
+    hist_gwp    = 1,
+    year_min    = 2005L,
+    y_label     = "Emissions (MtCO2e)"
+  ),
+  "CH4 Enteric Fermentation" = list(
+    fable_col   = "CalcLiveCH4",
+    hist_type   = "CH4 Enteric Fermentation",
+    hist_source = "SEEG13",
+    hist_gwp    = 27.2,
+    y_label     = "Emissions (MtCO2e)"
+  ),
+  "CH4 Rice" = list(
+    fable_col   = "CalcCropCH4",
+    hist_type   = "CH4 Rice",
+    hist_source = "SEEG13",
+    hist_gwp    = 27.2,
+    y_label     = "Emissions (MtCO2e)"
+  ),
+  "N2O from Agriculture" = list(
+    fable_cols  = c("CalcLiveN2O", "CalcCropN2O"),
+    hist_types  = c("N2O Animal Waste Management", "N2O Burning of Crop Residues",
+                    "N2O Decay of Crop Residues",  "N2O Inorganic Fertilizers",
+                    "N2O Manure Applied to Croplands", "N2O Pasture",
+                    "N2O Peatland", "N2O Soil Organic Matter Loss"),
+    hist_source = "SEEG13",
+    hist_gwp    = 273,
+    y_label     = "Emissions (MtCO2e)"
+  )
+)
+emissions_map <- Filter(function(cfg) {
+  cols <- if (!is.null(cfg$fable_cols)) cfg$fable_cols else cfg$fable_col
+  all(cols %in% fable_cols)
+}, emissions_map)
+
+get_emiss_fable <- function(emiss_name, scenario_name, x_max) {
+  cfg      <- emissions_map[[emiss_name]]
+  year_min <- if (!is.null(cfg$year_min)) cfg$year_min else 2000L
+  base <- df_scenarios %>% filter(scenario == scenario_name, Year >= year_min, Year <= x_max)
+  if (!is.null(cfg$fable_cols)) {
+    base %>%
+      select(year = Year, all_of(cfg$fable_cols)) %>%
+      mutate(value = rowSums(across(all_of(cfg$fable_cols), as.numeric), na.rm = TRUE)) %>%
+      select(year, value)
+  } else {
+    base %>%
+      select(year = Year, value = all_of(cfg$fable_col)) %>%
+      mutate(value = as.numeric(value))
+  }
+}
+
+get_emiss_hist <- function(emiss_name, x_max) {
+  cfg        <- emissions_map[[emiss_name]]
+  hmax       <- min(x_max, 2020)
+  year_min   <- if (!is.null(cfg$year_min)) cfg$year_min else 2000L
+  hist_types <- if (!is.null(cfg$hist_types)) cfg$hist_types else cfg$hist_type
+  df_hist %>%
+    filter(trimws(type) %in% hist_types,
+           trimws(source) == cfg$hist_source,
+           year >= year_min, year <= hmax) %>%
+    group_by(year) %>%
+    summarise(value = sum(as.numeric(value), na.rm = TRUE) * cfg$hist_gwp, .groups = "drop")
+}
+
+calc_emiss_y_range <- function(emiss_name, x_max) {
+  scen_vals <- bind_rows(
+    get_emiss_fable(emiss_name, "Current Trends",  x_max),
+    get_emiss_fable(emiss_name, "NDC Commitments", x_max)
+  )$value
+  hist_vals <- get_emiss_hist(emiss_name, x_max)$value
+  all_vals  <- c(scen_vals, hist_vals)
+  pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
+  c(0, max(all_vals, na.rm = TRUE) + pad)
+}
+
+make_emiss_combined_plot <- function(emiss_name, x_max, y_range, chart_type) {
+  cfg       <- emissions_map[[emiss_name]]
+  ct        <- get_emiss_fable(emiss_name, "Current Trends",  x_max)
+  ndc       <- get_emiss_fable(emiss_name, "NDC Commitments", x_max)
+  hist_data <- get_emiss_hist(emiss_name, x_max)
+  hover     <- function(nm) paste0("%{x}: <b>%{y:.2f} MtCO2e</b><extra>", nm, "</extra>")
+
+  if (chart_type == "Bar chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "bar", name = "Current Trends",
+                marker = list(color = COL_CT,  line = list(color = "black", width = 1)),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
+                marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
+                hovertemplate = hover("NDC Commitments"))
+  } else {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
+                name = "Current Trends",
+                line = list(color = COL_CT, width = 2), marker = list(color = COL_CT, size = 7),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
+                name = "NDC Commitments",
+                line = list(color = COL_NDC, width = 2), marker = list(color = COL_NDC, size = 7),
+                hovertemplate = hover("NDC Commitments"))
+  }
+  p <- p %>% add_hist_trace(hist_data, "SEEG13", chart_type, "MtCO2e")
+  year_min <- if (!is.null(cfg$year_min)) cfg$year_min else 2000L
+  base_layout(p, paste0(emiss_name, ": Current Trends vs NDC Commitments"),
+              x_max = x_max, y_range = y_range, y_label = cfg$y_label,
+              barmode = if (chart_type == "Bar chart") "group" else NULL,
+              x_min = year_min)
+}
+
+make_emiss_single_plot <- function(emiss_name, scenario_name, bar_color, x_max, y_range, chart_type) {
+  cfg        <- emissions_map[[emiss_name]]
+  scen       <- get_emiss_fable(emiss_name, scenario_name, x_max)
+  hist_data  <- get_emiss_hist(emiss_name, x_max)
+  hover_tmpl <- paste0("%{x}: <b>%{y:.2f} MtCO2e</b><extra>", scenario_name, "</extra>")
+
+  if (chart_type == "Bar chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
+                marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
+                name = scenario_name,
+                line = list(color = bar_color, width = 2), marker = list(color = bar_color, size = 7),
+                hovertemplate = hover_tmpl)
+  }
+  p <- p %>% add_hist_trace(hist_data, "SEEG13", chart_type, "MtCO2e")
+  year_min <- if (!is.null(cfg$year_min)) cfg$year_min else 2000L
+  base_layout(p, paste0(emiss_name, ": ", scenario_name),
+              bar_color, x_max = x_max, y_range = y_range, y_label = cfg$y_label,
+              barmode = if (chart_type == "Bar chart") "group" else NULL,
+              x_min = year_min)
+}
+
+make_emiss_table_data <- function(emiss_name, scenario_sel, x_max) {
+  year_min <- if (!is.null(emissions_map[[emiss_name]]$year_min)) emissions_map[[emiss_name]]$year_min else 2000L
+  years <- seq(year_min, x_max, 5)
+  rows  <- list()
+
+  pull_fable <- function(scen_name)
+    get_emiss_fable(emiss_name, scen_name, x_max) %>%
+      filter(year %in% years) %>% arrange(year) %>% pull(value)
+
+  if (scenario_sel %in% c("Both", "Current Trends"))
+    rows[["Current Trends"]] <- pull_fable("Current Trends")
+  if (scenario_sel %in% c("Both", "NDC Commitments"))
+    rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
+
+  hist_all <- get_emiss_hist(emiss_name, 2020)
+  rows[["Historical"]] <- sapply(years, function(y) {
+    if (y > 2020) return(NA_real_)
+    v <- hist_all$value[hist_all$year == y]
+    if (length(v) == 0) NA_real_ else v[1]
+  })
+
+  mat <- do.call(rbind, rows)
+  df  <- as.data.frame(mat)
+  colnames(df) <- as.character(years)
+  cbind(` ` = rownames(df), df, stringsAsFactors = FALSE)
+}
+
+make_emiss_diff_data <- function(emiss_name, scenario_sel, type = "absolute") {
+  year_min <- if (!is.null(emissions_map[[emiss_name]]$year_min)) emissions_map[[emiss_name]]$year_min else 2000L
+  years <- seq(year_min, 2020, 5)
+
+  hist_all  <- get_emiss_hist(emiss_name, 2020)
+  hist_vals <- sapply(years, function(y) {
+    v <- hist_all$value[hist_all$year == y]
+    if (length(v) == 0) NA_real_ else v[1]
+  })
+
+  pull_fable <- function(scen_name)
+    get_emiss_fable(emiss_name, scen_name, 2020) %>%
+      filter(year %in% years) %>% arrange(year) %>% pull(value)
+
+  rows <- list()
+  if (scenario_sel %in% c("Both", "Current Trends")) {
+    v <- pull_fable("Current Trends")
+    rows[["Current Trends"]] <- if (type == "absolute") abs(v - hist_vals)
+                                else (v - hist_vals) / hist_vals * 100
+  }
+  if (scenario_sel %in% c("Both", "NDC Commitments")) {
+    v <- pull_fable("NDC Commitments")
+    rows[["NDC Commitments"]] <- if (type == "absolute") abs(v - hist_vals)
+                                 else (v - hist_vals) / hist_vals * 100
+  }
+
+  mat <- do.call(rbind, rows)
+  df  <- as.data.frame(mat)
+  colnames(df) <- as.character(years)
+  cbind(` ` = rownames(df), df, stringsAsFactors = FALSE)
+}
+
+make_emiss_rel_diff_colored <- function(emiss_name, scenario_sel) {
+  df    <- make_emiss_diff_data(emiss_name, scenario_sel, "relative")
+  years <- names(df)[-1]
+  for (y in years)
+    df[[y]] <- vapply(as.numeric(df[[y]]), color_rel_val, character(1))
+  df
+}
+
 # ── UI ────────────────────────────────────────────────────────────────────────
 ui <- navbarPage(
-  title = "FABLE Calculator — Brazil",
+  title = "FABLE-Calculator Brazil v50",
 
   tabPanel("Land-use",
     br(),
@@ -624,6 +834,33 @@ ui <- navbarPage(
       )
     ),
     uiOutput("crop_charts_ui")
+  ),
+
+  tabPanel("Emissions",
+    br(),
+    fluidRow(
+      column(3,
+        selectInput("emiss_sel", "Emission:",
+                    choices  = names(emissions_map),
+                    selected = "CO2 AFOLU")
+      ),
+      column(3,
+        selectInput("emiss_scenario", "Scenario:",
+                    choices  = c("Both", "Current Trends", "NDC Commitments"),
+                    selected = "Both")
+      ),
+      column(3,
+        selectInput("emiss_years", "Years:",
+                    choices  = c("Calibration & Projections", "Calibration"),
+                    selected = "Calibration & Projections")
+      ),
+      column(3,
+        selectInput("emiss_chart_type", "Chart type:",
+                    choices  = c("Line chart", "Bar chart"),
+                    selected = "Line chart")
+      )
+    ),
+    uiOutput("emiss_charts_ui")
   )
 )
 
@@ -776,6 +1013,79 @@ server <- function(input, output, session) {
   })
   output$crop_plot_ndc <- renderPlotly({
     make_crop_single_plot(input$crop_name, input$crop_type, "NDC Commitments", COL_NDC, crop_x_max(), crop_y_range(), input$crop_chart_type)
+  })
+
+  # ── Emissions tab ─────────────────────────────────────────────────────────────
+  emiss_x_max <- reactive({
+    if (input$emiss_years == "Calibration") 2020L else 2050L
+  })
+
+  emiss_y_range <- reactive({
+    req(length(emissions_map) > 0, input$emiss_sel %in% names(emissions_map))
+    calc_emiss_y_range(input$emiss_sel, emiss_x_max())
+  })
+
+  output$emiss_charts_ui <- renderUI({
+    req(length(emissions_map) > 0)
+    y_label <- emissions_map[[input$emiss_sel]]$y_label
+
+    right_col <- if (input$emiss_years == "Calibration") {
+      tagList(
+        strong(y_label),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("emiss_data_table")),
+        strong("Absolute Difference (MtCO2e)"),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("emiss_abs_diff_table")),
+        strong("Relative Difference (%)"),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("emiss_rel_diff_table"))
+      )
+    } else {
+      tagList(
+        strong(y_label),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("emiss_data_table"))
+      )
+    }
+
+    switch(input$emiss_scenario,
+      "Both"            = fluidRow(
+        column(6, plotlyOutput("emiss_plot_both", height = "460px")),
+        column(6, right_col)
+      ),
+      "Current Trends"  = fluidRow(
+        column(6, plotlyOutput("emiss_plot_ct",   height = "460px")),
+        column(6, right_col)
+      ),
+      "NDC Commitments" = fluidRow(
+        column(6, plotlyOutput("emiss_plot_ndc",  height = "460px")),
+        column(6, right_col)
+      )
+    )
+  })
+
+  output$emiss_data_table <- renderTable(
+    make_emiss_table_data(input$emiss_sel, input$emiss_scenario, emiss_x_max()),
+    digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+  output$emiss_abs_diff_table <- renderTable(
+    make_emiss_diff_data(input$emiss_sel, input$emiss_scenario, "absolute"),
+    digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+  output$emiss_rel_diff_table <- renderTable(
+    make_emiss_rel_diff_colored(input$emiss_sel, input$emiss_scenario),
+    sanitize.text.function = identity,
+    na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+  output$emiss_plot_both <- renderPlotly({
+    make_emiss_combined_plot(input$emiss_sel, emiss_x_max(), emiss_y_range(), input$emiss_chart_type)
+  })
+  output$emiss_plot_ct <- renderPlotly({
+    make_emiss_single_plot(input$emiss_sel, "Current Trends",  COL_CT,  emiss_x_max(), emiss_y_range(), input$emiss_chart_type)
+  })
+  output$emiss_plot_ndc <- renderPlotly({
+    make_emiss_single_plot(input$emiss_sel, "NDC Commitments", COL_NDC, emiss_x_max(), emiss_y_range(), input$emiss_chart_type)
   })
 }
 

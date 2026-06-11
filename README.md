@@ -157,3 +157,42 @@ Values in the **Relative Difference** table are colour-coded by magnitude:
 | Yield | Derived | t/ha | Production (Mt) ÷ Area (Mha) |
 
 Historical reference comes from `histdatabrazil.csv` (IBGE). Layout, chart behaviour, data tables and colour encoding are identical to the Land-use tab, with the y-axis label updating per metric (Area (Mha) · Production (Mt) · Yield (t/ha)).
+
+## 🌫️ Shiny app — Emissions tab
+
+| Control | Options |
+|---------|---------|
+| **Emission** | CO2 AFOLU · CH4 Enteric Fermentation · CH4 Rice · N2O from Agriculture |
+| **Scenario** | Both · Current Trends · NDC Commitments |
+| **Years** | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
+| **Chart type** | Line chart · Bar chart |
+
+All values are in **MtCO2e**. Historical data from SEEG v13 is reported in million tonnes of the respective gas and converted to CO2e using IPCC AR6 GWP100 factors. FABLE Calculator columns are already in MtCO2e.
+
+### Emission types — source mapping
+
+| Emission | FABLE Calculator | Historical (SEEG v13) | Conversion |
+|----------|------------------|-----------------------|------------|
+| **CO2 AFOLU** | `CalcAllLandCO2e` | `CO2 AFOLU` | × 1 (already CO2e) |
+| **CH4 Enteric Fermentation** | `CalcLiveCH4` | `CH4 Enteric Fermentation` | × 27.2 (GWP100 AR6) |
+| **CH4 Rice** | `CalcCropCH4` | `CH4 Rice` | × 27.2 (GWP100 AR6) |
+| **N2O from Agriculture** | `CalcLiveN2O` + `CalcCropN2O` | Sum of 8 subcategories (see below) | × 273 (GWP100 AR6) |
+
+#### N2O from Agriculture — aggregation
+
+The FABLE Calculator value is the **sum of two columns**: `CalcLiveN2O` (livestock N2O) and `CalcCropN2O` (crop N2O), both already in MtCO2e.
+
+The historical series aggregates the following SEEG v13 subcategories and multiplies the total by 273:
+
+- N2O Animal Waste Management
+- N2O Burning of Crop Residues
+- N2O Decay of Crop Residues
+- N2O Inorganic Fertilizers
+- N2O Manure Applied to Croplands
+- N2O Pasture
+- N2O Peatland
+- N2O Soil Organic Matter Loss
+
+#### Note on CO2 AFOLU time range
+
+Charts and tables for **CO2 AFOLU start at 2005** (not 2000). The Calculator reports a value of 0 for the year 2000 in this column, which reflects a model calibration boundary rather than an observed or projected emission, so that data point is suppressed.
