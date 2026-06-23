@@ -353,6 +353,32 @@ Neither variable has a historical series — the chart shows scenario lines only
 
 Values are in **kcal/cap/day**. Source: `kcal_feas` column from the aggregate SCENATHON_report table. No historical data — the chart shows scenario lines only and the right panel shows a values table rounded to whole numbers.
 
+## 📄 Generating the Word report
+
+> **Experimental** — this feature is still under development and may produce incomplete or inconsistent output.
+
+`03_generate_report.R` generates a static Word document (`FABLE_Report_BRA_v50.docx`) with one landscape page per variable, each containing a line chart (Current Trends vs NDC Commitments + Historical where available) and a values table for 2000–2050.
+
+Additional packages required (beyond the Shiny app):
+
+```r
+install.packages(c("ggplot2", "officer", "flextable"))
+```
+
+Run from the project root:
+
+```r
+source("03_generate_report.R")
+```
+
+Or from the terminal:
+
+```bash
+Rscript 03_generate_report.R
+```
+
+The output file is saved in the project root. To update the table of contents in Word, press **Ctrl+A → F9**.
+
 ---
 
 👤 **Author**

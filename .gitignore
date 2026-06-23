@@ -11,6 +11,10 @@ data/processed/
 .claude/
 CLAUDE.md
 
+# Report outputs
+FABLE_Report_*.docx
+FABLE_Report_*.pdf
+
 # OS
 .DS_Store
 Thumbs.db
