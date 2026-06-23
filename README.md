@@ -355,4 +355,7 @@ Values are in **kcal/cap/day**. Source: `kcal_feas` column from the aggregate SC
 
 ---
 
+👤 **Author**
+Wanderson Costa (wcosta.comp@gmail.com)
+
 🤖 This application was developed with the assistance of [Claude Code](https://claude.ai/code).
