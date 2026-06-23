@@ -23,12 +23,28 @@ R (≥ 4.1) with the following packages:
 | `shiny` | Web app framework |
 | `plotly` | Interactive charts |
 | `bslib` | Bootstrap 5 theming |
+| `ggplot2` | Static charts (report only) |
+| `officer` | Word document generation (report only) |
+| `flextable` | Formatted tables in Word (report only) |
 
 Install all at once from the R console:
 
 ```r
-install.packages(c("readxl", "dplyr", "tidyr", "shiny", "plotly", "bslib"))
+install.packages(c("readxl", "dplyr", "tidyr", "shiny", "plotly", "bslib",
+                   "ggplot2", "officer", "flextable"))
 ```
+
+## 📂 Input data files
+
+Three files are required before running the app:
+
+| File | Location | Description |
+|------|----------|-------------|
+| FABLE Calculator — Current Trends | `data/xlsx/` | FABLE Calculator spreadsheet with the **Current Trends** pathway selected |
+| FABLE Calculator — NDC Commitments | `data/xlsx/` | FABLE Calculator spreadsheet with the **NDC Commitments** pathway selected |
+| Historical reference data | `data/csv/` | Long-format CSV (`histdatabrazil.csv`) with observed data for Brazil |
+
+File names are configured at the top of `01_process_data.R`.
 
 ## 📁 Repository structure
 
@@ -45,6 +61,7 @@ fable-scenario-comparison-brazil/
 │       └── FABLECalculator_BRA_UP50_NDC.xlsx
 ├── 01_process_data.R                        # Data ingestion and processing
 ├── 02_shiny_app.R                           # Shiny app logic
+├── 03_generate_report.R                     # Word report generator (all "Both" charts)
 ├── app.R                                    # Entry point (sources 02_shiny_app.R)
 ├── run.bat                                  # Windows one-click launcher
 └── README.md
@@ -69,6 +86,30 @@ Two tables are read from the `SCENATHON_report` sheet:
 
 - **Aggregate table** (header row 11, `skip = 10`) — one row per 5-year time step (2000–2050), wide format with land-use, emissions and other aggregate variables.
 - **Crop table** (header row 29, `skip = 28`) — long format with columns `Product`, `Year`, `ProdQ_feas` (production, 1000 t) and `FeasHarvarea` (harvested area, 1000 ha), one row per product per year.
+
+## 📄 Word report
+
+`03_generate_report.R` generates a static Word document (`FABLE_Report_BRA_v50.docx`) with:
+
+- **Cover page** — title, subtitle, date
+- **Table of Contents** — auto-generated Word TOC field (update with Ctrl+A → F9 in Word)
+- **32 content pages** (landscape, one per variable) — each contains a line chart comparing Current Trends vs NDC Commitments (+ Historical where available), followed by a values table for 2000–2050
+
+Sections: Land Use (5) · Emissions (4) · Crops (9) · Livestock (6) · Trade (7) · Food (1)
+
+Run from the project root:
+
+```r
+source("03_generate_report.R")
+```
+
+Or from the terminal:
+
+```bash
+Rscript 03_generate_report.R
+```
+
+Requires `ggplot2`, `officer`, and `flextable` in addition to the packages used by the Shiny app.
 
 ## 📥 Downloading data
 
@@ -297,3 +338,7 @@ Neither variable has a historical series — the chart shows scenario lines only
 | **Chart type** | Line chart · Bar chart |
 
 Values are in **kcal/cap/day**. Source: `kcal_feas` column from the aggregate SCENATHON_report table. No historical data — the chart shows scenario lines only and the right panel shows a values table rounded to whole numbers.
+
+---
+
+🤖 This application was developed with the assistance of [Claude Code](https://claude.ai/code).
