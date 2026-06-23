@@ -34,6 +34,18 @@ install.packages(c("readxl", "dplyr", "tidyr", "shiny", "plotly", "bslib",
                    "ggplot2", "officer", "flextable"))
 ```
 
+## ▶️ One-click launchers
+
+Double-click the file for your operating system to start the app directly — no terminal needed:
+
+| OS | File | Notes |
+|----|------|-------|
+| **Windows** | `open_app_windows.bat` | Double-click in File Explorer |
+| **macOS** | `open_app_mac.command` | First time: right-click → Open (Gatekeeper). After that, double-click works. If it still doesn't run, open a terminal in the project folder and run `chmod +x open_app_mac.command` once. |
+| **Ubuntu** | `open_app_ubuntu.sh` | In Nautilus: Edit → Preferences → Behaviour → "Run executable text files when they are opened". Then double-click. Alternatively, right-click → Run as a Program. If needed, run `chmod +x open_app_ubuntu.sh` once in a terminal first. |
+
+All three launchers auto-detect their own location and open the browser automatically on first run.
+
 ## 📂 Input data files
 
 Three files are required before running the app:
@@ -63,7 +75,9 @@ fable-scenario-comparison-brazil/
 ├── 02_shiny_app.R                           # Shiny app logic
 ├── 03_generate_report.R                     # Word report generator (all "Both" charts)
 ├── app.R                                    # Entry point (sources 02_shiny_app.R)
-├── run.bat                                  # Windows one-click launcher
+├── open_app_windows.bat                     # Windows one-click launcher
+├── open_app_mac.command                     # macOS one-click launcher
+├── open_app_ubuntu.sh                       # Ubuntu one-click launcher
 └── README.md
 ```
 
@@ -123,7 +137,7 @@ Every tab has a **CSV** button next to the values table header. Clicking it down
 Rscript app.R
 ```
 
-Or double-click `run.bat` on Windows. Both work from any directory — the app auto-detects its own location and opens the browser automatically.
+Or use one of the one-click launchers (`open_app_windows.bat`, `open_app_mac.command`, `open_app_ubuntu.sh`). All work from any directory — the app auto-detects its own location and opens the browser automatically.
 
 **RStudio**
 
