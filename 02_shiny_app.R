@@ -272,10 +272,10 @@ make_table_data <- function(class_name, scenario_sel, x_max) {
     to_mha(raw, col, cfg$fable_unit)
   }
 
-  if (scenario_sel %in% c("Both", "Current Trends"))
+  if ("Current Trends" %in% scenario_sel)
     rows[["Current Trends"]] <- pull_scenario("Current Trends")
 
-  if (scenario_sel %in% c("Both", "NDC Commitments"))
+  if ("NDC Commitments" %in% scenario_sel)
     rows[["NDC Commitments"]] <- pull_scenario("NDC Commitments")
 
   hist_data <- get_hist(class_name, 2020)
@@ -313,12 +313,12 @@ make_diff_data <- function(class_name, scenario_sel, type = "absolute") {
   }
 
   rows <- list()
-  if (scenario_sel %in% c("Both", "Current Trends")) {
+  if ("Current Trends" %in% scenario_sel) {
     v <- pull_scenario("Current Trends")
     rows[["Current Trends"]] <- if (type == "absolute") abs(v - hist_vals)
                                 else (v - hist_vals) / hist_vals * 100
   }
-  if (scenario_sel %in% c("Both", "NDC Commitments")) {
+  if ("NDC Commitments" %in% scenario_sel) {
     v <- pull_scenario("NDC Commitments")
     rows[["NDC Commitments"]] <- if (type == "absolute") abs(v - hist_vals)
                                  else (v - hist_vals) / hist_vals * 100
@@ -515,9 +515,9 @@ make_crop_table_data <- function(crop_name, type_sel, scenario_sel, x_max) {
     get_crop_fable(crop_name, type_sel, scen_name, x_max) %>%
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
-  if (scenario_sel %in% c("Both", "Current Trends"))
+  if ("Current Trends" %in% scenario_sel)
     rows[["Current Trends"]] <- pull_fable("Current Trends")
-  if (scenario_sel %in% c("Both", "NDC Commitments"))
+  if ("NDC Commitments" %in% scenario_sel)
     rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
 
   hist_all <- get_crop_hist_data(crop_name, type_sel, 2020)
@@ -547,12 +547,12 @@ make_crop_diff_data <- function(crop_name, type_sel, scenario_sel, type = "absol
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
   rows <- list()
-  if (scenario_sel %in% c("Both", "Current Trends")) {
+  if ("Current Trends" %in% scenario_sel) {
     v <- pull_fable("Current Trends")
     rows[["Current Trends"]] <- if (type == "absolute") abs(v - hist_vals)
                                 else (v - hist_vals) / hist_vals * 100
   }
-  if (scenario_sel %in% c("Both", "NDC Commitments")) {
+  if ("NDC Commitments" %in% scenario_sel) {
     v <- pull_fable("NDC Commitments")
     rows[["NDC Commitments"]] <- if (type == "absolute") abs(v - hist_vals)
                                  else (v - hist_vals) / hist_vals * 100
@@ -712,9 +712,9 @@ make_live_table_data <- function(product, scenario_sel, x_max) {
     get_live_fable(product, scen_name, x_max) %>%
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
-  if (scenario_sel %in% c("Both", "Current Trends"))
+  if ("Current Trends" %in% scenario_sel)
     rows[["Current Trends"]] <- pull_fable("Current Trends")
-  if (scenario_sel %in% c("Both", "NDC Commitments"))
+  if ("NDC Commitments" %in% scenario_sel)
     rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
 
   if (livestock_map[[product]]$has_hist) {
@@ -747,12 +747,12 @@ make_live_diff_data <- function(product, scenario_sel, type = "absolute") {
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
   rows <- list()
-  if (scenario_sel %in% c("Both", "Current Trends")) {
+  if ("Current Trends" %in% scenario_sel) {
     v <- pull_fable("Current Trends")
     rows[["Current Trends"]] <- if (type == "absolute") abs(v - hist_vals)
                                 else (v - hist_vals) / hist_vals * 100
   }
-  if (scenario_sel %in% c("Both", "NDC Commitments")) {
+  if ("NDC Commitments" %in% scenario_sel) {
     v <- pull_fable("NDC Commitments")
     rows[["NDC Commitments"]] <- if (type == "absolute") abs(v - hist_vals)
                                  else (v - hist_vals) / hist_vals * 100
@@ -886,9 +886,9 @@ make_trade_table_data <- function(trade_type, product, scenario_sel, x_max) {
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
   rows <- list()
-  if (scenario_sel %in% c("Both", "Current Trends"))
+  if ("Current Trends" %in% scenario_sel)
     rows[["Current Trends"]] <- pull_fable("Current Trends")
-  if (scenario_sel %in% c("Both", "NDC Commitments"))
+  if ("NDC Commitments" %in% scenario_sel)
     rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
 
   mat <- do.call(rbind, rows)
@@ -988,9 +988,9 @@ make_food_table_data <- function(variable, scenario_sel, x_max) {
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
   rows <- list()
-  if (scenario_sel %in% c("Both", "Current Trends"))
+  if ("Current Trends" %in% scenario_sel)
     rows[["Current Trends"]] <- pull_fable("Current Trends")
-  if (scenario_sel %in% c("Both", "NDC Commitments"))
+  if ("NDC Commitments" %in% scenario_sel)
     rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
 
   mat <- do.call(rbind, rows)
@@ -1154,9 +1154,9 @@ make_emiss_table_data <- function(emiss_name, scenario_sel, x_max) {
     get_emiss_fable(emiss_name, scen_name, x_max) %>%
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
-  if (scenario_sel %in% c("Both", "Current Trends"))
+  if ("Current Trends" %in% scenario_sel)
     rows[["Current Trends"]] <- pull_fable("Current Trends")
-  if (scenario_sel %in% c("Both", "NDC Commitments"))
+  if ("NDC Commitments" %in% scenario_sel)
     rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
 
   hist_all <- get_emiss_hist(emiss_name, 2020)
@@ -1187,12 +1187,12 @@ make_emiss_diff_data <- function(emiss_name, scenario_sel, type = "absolute") {
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
   rows <- list()
-  if (scenario_sel %in% c("Both", "Current Trends")) {
+  if ("Current Trends" %in% scenario_sel) {
     v <- pull_fable("Current Trends")
     rows[["Current Trends"]] <- if (type == "absolute") abs(v - hist_vals)
                                 else (v - hist_vals) / hist_vals * 100
   }
-  if (scenario_sel %in% c("Both", "NDC Commitments")) {
+  if ("NDC Commitments" %in% scenario_sel) {
     v <- pull_fable("NDC Commitments")
     rows[["NDC Commitments"]] <- if (type == "absolute") abs(v - hist_vals)
                                  else (v - hist_vals) / hist_vals * 100
@@ -1266,9 +1266,9 @@ ui <- page_navbar(
         selectInput("class_sel", "Landuse Class",
                     choices  = names(landuse_map),
                     selected = "Forest"),
-        radioButtons("scenario_sel", "Scenario",
-                    choices  = c("Both", "Current Trends", "NDC Commitments"),
-                    selected = "Both"),
+        checkboxGroupInput("scenario_sel", "Scenario",
+                    choices  = c("Current Trends", "NDC Commitments"),
+                    selected = c("Current Trends", "NDC Commitments")),
         radioButtons("years_sel", "Years",
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
@@ -1287,9 +1287,9 @@ ui <- page_navbar(
         selectInput("emiss_sel", "Emission",
                     choices  = names(emissions_map),
                     selected = "CO₂ AFOLU"),
-        radioButtons("emiss_scenario", "Scenario",
-                    choices  = c("Both", "Current Trends", "NDC Commitments"),
-                    selected = "Both"),
+        checkboxGroupInput("emiss_scenario", "Scenario",
+                    choices  = c("Current Trends", "NDC Commitments"),
+                    selected = c("Current Trends", "NDC Commitments")),
         radioButtons("emiss_years", "Years",
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
@@ -1311,9 +1311,9 @@ ui <- page_navbar(
         selectInput("crop_type", "Type",
                     choices  = c("Area", "Production", "Yield"),
                     selected = "Area"),
-        radioButtons("crop_scenario", "Scenario",
-                    choices  = c("Both", "Current Trends", "NDC Commitments"),
-                    selected = "Both"),
+        checkboxGroupInput("crop_scenario", "Scenario",
+                    choices  = c("Current Trends", "NDC Commitments"),
+                    selected = c("Current Trends", "NDC Commitments")),
         radioButtons("crop_years", "Years",
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
@@ -1334,9 +1334,9 @@ ui <- page_navbar(
                                  "Chicken Production", "Pork Production",
                                  "Cattle Herd", "Cattle Stocking Rate"),
                     selected = "Beef Production"),
-        radioButtons("live_scenario", "Scenario",
-                    choices  = c("Both", "Current Trends", "NDC Commitments"),
-                    selected = "Both"),
+        checkboxGroupInput("live_scenario", "Scenario",
+                    choices  = c("Current Trends", "NDC Commitments"),
+                    selected = c("Current Trends", "NDC Commitments")),
         radioButtons("live_years", "Years",
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
@@ -1359,9 +1359,9 @@ ui <- page_navbar(
                     choices  = c("Soybeans (all)", "Soybeans (grain)", "Soybeans (cake)",
                                  "Soybeans (oil)", "Corn", "Beef"),
                     selected = "Soybeans (all)"),
-        radioButtons("trade_scenario", "Scenario",
-                    choices  = c("Both", "Current Trends", "NDC Commitments"),
-                    selected = "Both"),
+        checkboxGroupInput("trade_scenario", "Scenario",
+                    choices  = c("Current Trends", "NDC Commitments"),
+                    selected = c("Current Trends", "NDC Commitments")),
         radioButtons("trade_years", "Years",
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
@@ -1380,9 +1380,9 @@ ui <- page_navbar(
         selectInput("food_variable", "Variable",
                     choices  = names(food_map),
                     selected = "Food Consumption"),
-        radioButtons("food_scenario", "Scenario",
-                    choices  = c("Both", "Current Trends", "NDC Commitments"),
-                    selected = "Both"),
+        checkboxGroupInput("food_scenario", "Scenario",
+                    choices  = c("Current Trends", "NDC Commitments"),
+                    selected = c("Current Trends", "NDC Commitments")),
         radioButtons("food_years", "Years",
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
@@ -1436,11 +1436,13 @@ server <- function(input, output, session) {
       )
     }
 
-    chart_out <- switch(input$scenario_sel,
-      "Both"            = plotlyOutput("plot_both", height = "460px"),
-      "Current Trends"  = plotlyOutput("plot_ct",   height = "460px"),
-      "NDC Commitments" = plotlyOutput("plot_ndc",  height = "460px")
-    )
+    req(length(input$scenario_sel) > 0)
+    chart_out <- if (all(c("Current Trends", "NDC Commitments") %in% input$scenario_sel))
+      plotlyOutput("plot_both", height = "460px")
+    else if ("Current Trends" %in% input$scenario_sel)
+      plotlyOutput("plot_ct",   height = "460px")
+    else
+      plotlyOutput("plot_ndc",  height = "460px")
     if (x_max() == 2050) {
       tagList(
         fluidRow(column(6, chart_out)),
@@ -1469,7 +1471,7 @@ server <- function(input, output, session) {
   output$landuse_dl <- downloadHandler(
     filename = function() {
       nm <- gsub(" ", "_", input$class_sel)
-      sc <- gsub(" ", "_", input$scenario_sel)
+      sc <- if (length(input$scenario_sel) == 2) "Both" else gsub(" ", "_", input$scenario_sel)
       paste0("landuse_", nm, "_", sc, "_", x_max(), ".csv")
     },
     content = function(file) {
@@ -1530,11 +1532,13 @@ server <- function(input, output, session) {
       )
     }
 
-    chart_out <- switch(input$crop_scenario,
-      "Both"            = plotlyOutput("crop_plot_both", height = "460px"),
-      "Current Trends"  = plotlyOutput("crop_plot_ct",   height = "460px"),
-      "NDC Commitments" = plotlyOutput("crop_plot_ndc",  height = "460px")
-    )
+    req(length(input$crop_scenario) > 0)
+    chart_out <- if (all(c("Current Trends", "NDC Commitments") %in% input$crop_scenario))
+      plotlyOutput("crop_plot_both", height = "460px")
+    else if ("Current Trends" %in% input$crop_scenario)
+      plotlyOutput("crop_plot_ct",   height = "460px")
+    else
+      plotlyOutput("crop_plot_ndc",  height = "460px")
     if (crop_x_max() == 2050) {
       tagList(
         fluidRow(column(6, chart_out)),
@@ -1560,9 +1564,9 @@ server <- function(input, output, session) {
   )
   output$crop_dl <- downloadHandler(
     filename = function() {
+      sc <- if (length(input$crop_scenario) == 2) "Both" else gsub(" ", "_", input$crop_scenario)
       paste0("crops_", gsub(" ", "_", input$crop_name), "_",
-             input$crop_type, "_", gsub(" ", "_", input$crop_scenario), "_",
-             crop_x_max(), ".csv")
+             input$crop_type, "_", sc, "_", crop_x_max(), ".csv")
     },
     content = function(file) {
       write.csv(make_crop_table_data(input$crop_name, input$crop_type,
@@ -1622,11 +1626,13 @@ server <- function(input, output, session) {
       )
     }
 
-    chart_out <- switch(input$live_scenario,
-      "Both"            = plotlyOutput("live_plot_both", height = "460px"),
-      "Current Trends"  = plotlyOutput("live_plot_ct",   height = "460px"),
-      "NDC Commitments" = plotlyOutput("live_plot_ndc",  height = "460px")
-    )
+    req(length(input$live_scenario) > 0)
+    chart_out <- if (all(c("Current Trends", "NDC Commitments") %in% input$live_scenario))
+      plotlyOutput("live_plot_both", height = "460px")
+    else if ("Current Trends" %in% input$live_scenario)
+      plotlyOutput("live_plot_ct",   height = "460px")
+    else
+      plotlyOutput("live_plot_ndc",  height = "460px")
     if (live_x_max() == 2050) {
       tagList(
         fluidRow(column(6, chart_out)),
@@ -1652,8 +1658,8 @@ server <- function(input, output, session) {
   )
   output$live_dl <- downloadHandler(
     filename = function() {
-      paste0("livestock_", gsub(" ", "_", input$live_product), "_",
-             gsub(" ", "_", input$live_scenario), "_", live_x_max(), ".csv")
+      sc <- if (length(input$live_scenario) == 2) "Both" else gsub(" ", "_", input$live_scenario)
+      paste0("livestock_", gsub(" ", "_", input$live_product), "_", sc, "_", live_x_max(), ".csv")
     },
     content = function(file) {
       write.csv(make_live_table_data(input$live_product, input$live_scenario, live_x_max()),
@@ -1701,11 +1707,13 @@ server <- function(input, output, session) {
           tableOutput("trade_data_table"))
     )
 
-    chart_out <- switch(input$trade_scenario,
-      "Both"            = plotlyOutput("trade_plot_both", height = "460px"),
-      "Current Trends"  = plotlyOutput("trade_plot_ct",   height = "460px"),
-      "NDC Commitments" = plotlyOutput("trade_plot_ndc",  height = "460px")
-    )
+    req(length(input$trade_scenario) > 0)
+    chart_out <- if (all(c("Current Trends", "NDC Commitments") %in% input$trade_scenario))
+      plotlyOutput("trade_plot_both", height = "460px")
+    else if ("Current Trends" %in% input$trade_scenario)
+      plotlyOutput("trade_plot_ct",   height = "460px")
+    else
+      plotlyOutput("trade_plot_ndc",  height = "460px")
     if (trade_x_max() == 2050) {
       tagList(
         fluidRow(column(6, chart_out)),
@@ -1724,8 +1732,8 @@ server <- function(input, output, session) {
   output$trade_dl <- downloadHandler(
     filename = function() {
       prod <- gsub("[() ]", "_", input$trade_product)
-      paste0("trade_", input$trade_type, "_", prod, "_",
-             gsub(" ", "_", input$trade_scenario), "_", trade_x_max(), ".csv")
+      sc <- if (length(input$trade_scenario) == 2) "Both" else gsub(" ", "_", input$trade_scenario)
+      paste0("trade_", input$trade_type, "_", prod, "_", sc, "_", trade_x_max(), ".csv")
     },
     content = function(file) {
       write.csv(make_trade_table_data(input$trade_type, input$trade_product,
@@ -1769,11 +1777,13 @@ server <- function(input, output, session) {
           tableOutput("food_data_table"))
     )
 
-    chart_out <- switch(input$food_scenario,
-      "Both"            = plotlyOutput("food_plot_both", height = "460px"),
-      "Current Trends"  = plotlyOutput("food_plot_ct",   height = "460px"),
-      "NDC Commitments" = plotlyOutput("food_plot_ndc",  height = "460px")
-    )
+    req(length(input$food_scenario) > 0)
+    chart_out <- if (all(c("Current Trends", "NDC Commitments") %in% input$food_scenario))
+      plotlyOutput("food_plot_both", height = "460px")
+    else if ("Current Trends" %in% input$food_scenario)
+      plotlyOutput("food_plot_ct",   height = "460px")
+    else
+      plotlyOutput("food_plot_ndc",  height = "460px")
     if (food_x_max() == 2050) {
       tagList(
         fluidRow(column(6, chart_out)),
@@ -1790,8 +1800,8 @@ server <- function(input, output, session) {
   )
   output$food_dl <- downloadHandler(
     filename = function() {
-      paste0("food_", gsub(" ", "_", input$food_variable), "_",
-             gsub(" ", "_", input$food_scenario), "_", food_x_max(), ".csv")
+      sc <- if (length(input$food_scenario) == 2) "Both" else gsub(" ", "_", input$food_scenario)
+      paste0("food_", gsub(" ", "_", input$food_variable), "_", sc, "_", food_x_max(), ".csv")
     },
     content = function(file) {
       write.csv(make_food_table_data(input$food_variable, input$food_scenario, food_x_max()),
@@ -1853,11 +1863,13 @@ server <- function(input, output, session) {
       )
     }
 
-    chart_out <- switch(input$emiss_scenario,
-      "Both"            = plotlyOutput("emiss_plot_both", height = "460px"),
-      "Current Trends"  = plotlyOutput("emiss_plot_ct",   height = "460px"),
-      "NDC Commitments" = plotlyOutput("emiss_plot_ndc",  height = "460px")
-    )
+    req(length(input$emiss_scenario) > 0)
+    chart_out <- if (all(c("Current Trends", "NDC Commitments") %in% input$emiss_scenario))
+      plotlyOutput("emiss_plot_both", height = "460px")
+    else if ("Current Trends" %in% input$emiss_scenario)
+      plotlyOutput("emiss_plot_ct",   height = "460px")
+    else
+      plotlyOutput("emiss_plot_ndc",  height = "460px")
     if (emiss_x_max() == 2050) {
       tagList(
         fluidRow(column(6, chart_out)),
@@ -1884,7 +1896,7 @@ server <- function(input, output, session) {
   output$emiss_dl <- downloadHandler(
     filename = function() {
       nm <- gsub(" ", "_", input$emiss_sel)
-      sc <- gsub(" ", "_", input$emiss_scenario)
+      sc <- if (length(input$emiss_scenario) == 2) "Both" else gsub(" ", "_", input$emiss_scenario)
       paste0("emissions_", nm, "_", sc, "_", emiss_x_max(), ".csv")
     },
     content = function(file) {
