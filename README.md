@@ -178,6 +178,14 @@ The app uses **Bootstrap 5** via the `bslib` package. The navbar displays in two
 
 Controls are grouped in a **sidebar panel** on the left of each tab. Scenario, Years, and Chart type are shown as radio buttons; the variable selector (land-use class, emission type, crop, etc.) uses a dropdown. Sidebar labels are bold without trailing colons. A **Start y-axis at zero** checkbox controls whether the y-axis is forced to start at zero (checked by default) or auto-scaled to the data range. For CO₂ AFOLU, the checkbox is unchecked by default and resets automatically when switching to that emission, since its values can be negative.
 
+All tabs support three **Chart types**:
+
+| Type | Description |
+|------|-------------|
+| **Line chart** | Lines with markers; scenario colours (blue CT, green NDC); historical in black |
+| **Bar chart** | Grouped bars with black border; historical in near-black (`#1a1a1a`) |
+| **Area chart** | Filled area to y = 0; semi-transparent fill (25% opacity) in scenario colours; black border line; historical as dashed black line without fill |
+
 ## 📊 Shiny app — Land Use tab
 
 The controls are displayed in this order:

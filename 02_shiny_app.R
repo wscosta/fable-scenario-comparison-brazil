@@ -68,6 +68,13 @@ COL_HIST <- "#000000"
 COL_CT   <- "#1565C0"
 COL_NDC  <- "#009C3B"
 
+hex_to_rgba <- function(hex, alpha = 0.25) {
+  r <- strtoi(substr(hex, 2, 3), 16L)
+  g <- strtoi(substr(hex, 4, 5), 16L)
+  b <- strtoi(substr(hex, 6, 7), 16L)
+  sprintf("rgba(%d,%d,%d,%.2f)", r, g, b, alpha)
+}
+
 # ── Shared layout helper ──────────────────────────────────────────────────────
 base_layout <- function(p, title_text, title_color = "black", x_max, y_range,
                         y_label = "Area (Mha)", barmode = NULL, x_min = 2000L,
@@ -156,6 +163,12 @@ add_hist_trace <- function(p, hist_data, source_label, chart_type = "Line chart"
               marker = list(color = "#1a1a1a",
                             line  = list(color = "black", width = 1)),
               hovertemplate = hover)
+  } else if (chart_type == "Area chart") {
+    add_trace(p, data = hist_data, x = ~year, y = ~value,
+              type = "scatter", mode = "lines",
+              name = trace_name,
+              line = list(color = "black", width = 1.5, dash = "dash"),
+              hovertemplate = hover)
   } else {
     add_trace(p, data = hist_data, x = ~year, y = ~value,
               type = "scatter", mode = "lines+markers",
@@ -193,6 +206,21 @@ make_combined_plot <- function(class_name, x_max, y_range, chart_type = "Line ch
                 type = "bar", name = "NDC Commitments",
                 marker = list(color = COL_NDC,
                               line  = list(color = "black", width = 1)),
+                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>NDC Commitments</extra>") %>%
+      add_hist_trace(hist_data, source_label, chart_type)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct, x = ~year, y = ~value,
+                type = "scatter", mode = "lines", fill = "tozeroy",
+                fillcolor = hex_to_rgba(COL_CT, 0.25),
+                name = "Current Trends",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>Current Trends</extra>") %>%
+      add_trace(data = ndc, x = ~year, y = ~value,
+                type = "scatter", mode = "lines", fill = "tozeroy",
+                fillcolor = hex_to_rgba(COL_NDC, 0.25),
+                name = "NDC Commitments",
+                line = list(color = "black", width = 1.5),
                 hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>NDC Commitments</extra>") %>%
       add_hist_trace(hist_data, source_label, chart_type)
   } else {
@@ -237,6 +265,15 @@ make_single_plot <- function(class_name, scenario_name, bar_color, x_max, y_rang
                 type = "bar", name = scenario_name,
                 marker = list(color = bar_color,
                               line  = list(color = "black", width = 1)),
+                hovertemplate = hover) %>%
+      add_hist_trace(hist_data, source_label, chart_type)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value,
+                type = "scatter", mode = "lines", fill = "tozeroy",
+                fillcolor = hex_to_rgba(bar_color, 0.25),
+                name = scenario_name,
+                line = list(color = "black", width = 1.5),
                 hovertemplate = hover) %>%
       add_hist_trace(hist_data, source_label, chart_type)
   } else {
@@ -462,6 +499,18 @@ make_crop_combined_plot <- function(crop_name, type_sel, x_max, y_range, chart_t
       add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
                 marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
                 hovertemplate = hover("NDC Commitments"))
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
+                name = "Current Trends",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
+                name = "NDC Commitments",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("NDC Commitments"))
   } else {
     p <- plot_ly() %>%
       add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
@@ -492,6 +541,13 @@ make_crop_single_plot <- function(crop_name, type_sel, scenario_name, bar_color,
     p <- plot_ly() %>%
       add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
                 marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
+                name = scenario_name,
+                line = list(color = "black", width = 1.5),
                 hovertemplate = hover_tmpl)
   } else {
     p <- plot_ly() %>%
@@ -659,6 +715,18 @@ make_live_combined_plot <- function(product, x_max, y_range, chart_type) {
       add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
                 marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
                 hovertemplate = hover("NDC Commitments"))
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
+                name = "Current Trends",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
+                name = "NDC Commitments",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("NDC Commitments"))
   } else {
     p <- plot_ly() %>%
       add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
@@ -689,6 +757,13 @@ make_live_single_plot <- function(product, scenario_name, bar_color, x_max, y_ra
     p <- plot_ly() %>%
       add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
                 marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
+                name = scenario_name,
+                line = list(color = "black", width = 1.5),
                 hovertemplate = hover_tmpl)
   } else {
     p <- plot_ly() %>%
@@ -838,6 +913,18 @@ make_trade_combined_plot <- function(trade_type, product, x_max, y_range, chart_
       add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
                 marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
                 hovertemplate = hover("NDC Commitments"))
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
+                name = "Current Trends",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
+                name = "NDC Commitments",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("NDC Commitments"))
   } else {
     p <- plot_ly() %>%
       add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
@@ -863,6 +950,13 @@ make_trade_single_plot <- function(trade_type, product, scenario_name, bar_color
     p <- plot_ly() %>%
       add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
                 marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
+                name = scenario_name,
+                line = list(color = "black", width = 1.5),
                 hovertemplate = hover_tmpl)
   } else {
     p <- plot_ly() %>%
@@ -941,6 +1035,18 @@ make_food_combined_plot <- function(variable, x_max, y_range, chart_type) {
       add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
                 marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
                 hovertemplate = hover("NDC Commitments"))
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
+                name = "Current Trends",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
+                name = "NDC Commitments",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("NDC Commitments"))
   } else {
     p <- plot_ly() %>%
       add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
@@ -966,6 +1072,13 @@ make_food_single_plot <- function(variable, scenario_name, bar_color, x_max, y_r
     p <- plot_ly() %>%
       add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
                 marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
+                name = scenario_name,
+                line = list(color = "black", width = 1.5),
                 hovertemplate = hover_tmpl)
   } else {
     p <- plot_ly() %>%
@@ -1098,6 +1211,18 @@ make_emiss_combined_plot <- function(emiss_name, x_max, y_range, chart_type) {
       add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
                 marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
                 hovertemplate = hover("NDC Commitments"))
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
+                name = "Current Trends",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
+                name = "NDC Commitments",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("NDC Commitments"))
   } else {
     p <- plot_ly() %>%
       add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
@@ -1128,6 +1253,13 @@ make_emiss_single_plot <- function(emiss_name, scenario_name, bar_color, x_max, 
     p <- plot_ly() %>%
       add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
                 marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
+                name = scenario_name,
+                line = list(color = "black", width = 1.5),
                 hovertemplate = hover_tmpl)
   } else {
     p <- plot_ly() %>%
@@ -1350,7 +1482,7 @@ ui <- page_navbar(
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
         radioButtons("chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart"),
+                    choices  = c("Line chart", "Bar chart", "Area chart"),
                     selected = "Line chart"),
         checkboxInput("zero_base", "Start y-axis at zero", value = TRUE)
       ),
@@ -1371,7 +1503,7 @@ ui <- page_navbar(
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
         radioButtons("emiss_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart"),
+                    choices  = c("Line chart", "Bar chart", "Area chart"),
                     selected = "Line chart"),
         checkboxInput("emiss_zero_base", "Start y-axis at zero", value = FALSE)
       ),
@@ -1395,7 +1527,7 @@ ui <- page_navbar(
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
         radioButtons("crop_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart"),
+                    choices  = c("Line chart", "Bar chart", "Area chart"),
                     selected = "Line chart"),
         checkboxInput("crop_zero_base", "Start y-axis at zero", value = TRUE)
       ),
@@ -1418,7 +1550,7 @@ ui <- page_navbar(
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
         radioButtons("live_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart"),
+                    choices  = c("Line chart", "Bar chart", "Area chart"),
                     selected = "Line chart"),
         checkboxInput("live_zero_base", "Start y-axis at zero", value = TRUE)
       ),
@@ -1443,7 +1575,7 @@ ui <- page_navbar(
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
         radioButtons("trade_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart"),
+                    choices  = c("Line chart", "Bar chart", "Area chart"),
                     selected = "Line chart"),
         checkboxInput("trade_zero_base", "Start y-axis at zero", value = TRUE)
       ),
@@ -1464,7 +1596,7 @@ ui <- page_navbar(
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
         radioButtons("food_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart"),
+                    choices  = c("Line chart", "Bar chart", "Area chart"),
                     selected = "Line chart"),
         checkboxInput("food_zero_base", "Start y-axis at zero", value = TRUE)
       ),
