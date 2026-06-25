@@ -18,6 +18,9 @@ CLAUDE.md
 FABLE_Report_*.docx
 FABLE_Report_*.pdf
 
+# Temporary / local scripts
+generate_diff_maps.bat
+
 # OS
 .DS_Store
 Thumbs.db

@@ -51,10 +51,16 @@ scenarios <- list(
 )
 
 args <- commandArgs(trailingOnly = TRUE)
+diff_only <- FALSE
 if (length(args) > 0) {
   arg <- tolower(trimws(args[1]))
-  if (!arg %in% names(scenarios)) stop("Unknown scenario '", arg, "'. Use: ct | ndc")
-  scenarios <- scenarios[arg]
+  if (arg == "diff") {
+    diff_only <- TRUE
+  } else if (arg %in% names(scenarios)) {
+    scenarios <- scenarios[arg]
+  } else {
+    stop("Unknown argument '", arg, "'. Use: ct | ndc | diff")
+  }
 }
 
 brazil_ext <- ext(-75, -33, -36, 6.75)
@@ -80,8 +86,9 @@ key_transitions <- list(
 )
 
 # Difference map (NDC - CT): diverging RdBu, blue = NDC more, red = NDC less
-diff_ceil <- 150   # 1000 ha symmetric scale; adjust if needed
-diff_pal  <- brewer.pal(11, "RdBu")
+# 1001 colours so white sits exactly at 0 (each step = 0.62 * 1000 ha)
+diff_ceil <- 310
+diff_pal  <- colorRampPalette(brewer.pal(11, "RdBu"))(1001)
 
 # =============================================================================
 # 1.  Shared spatial objects
@@ -336,7 +343,7 @@ run_diff <- function() {
 # 5.  Run
 # =============================================================================
 
-for (sc in scenarios) run_scenario(sc)
+if (!diff_only) for (sc in scenarios) run_scenario(sc)
 run_diff()
 
 cat("\nAll done.\n")
