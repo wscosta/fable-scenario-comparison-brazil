@@ -1222,7 +1222,25 @@ ui <- page_navbar(
   window_title = "FABLE-Calculator Brazil v50",
   header = tags$head(
     tags$link(rel = "icon", type = "image/svg+xml", href = "images/favicon.svg"),
+    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Raleway:wght@600&family=Montserrat:wght@400;500&display=swap"),
     tags$style(HTML("
+      .navbar { background: linear-gradient(90deg, #2E7D32 0%, #C8A000 25%, #002776 50%, #C8A000 75%, #2E7D32 100%) !important; }
+      .navbar-brand, .navbar .nav-link, .navbar .navbar-text { text-shadow: 0 1px 3px rgba(0,0,0,0.55) !important; }
+      .navbar-brand span { font-family: 'Raleway', sans-serif !important; font-weight: 600 !important; letter-spacing: 0.02em; }
+      .navbar .nav-link  { font-family: 'Montserrat', sans-serif !important; font-weight: 500 !important; letter-spacing: 0.01em; }
+      .navbar .nav-link         { color: rgba(255,255,255,0.85) !important; }
+      .navbar .nav-link:hover   { color: rgba(255,255,255,0.97) !important; }
+      .navbar .nav-link.active  { color: rgba(255,255,255,1.00) !important; }
+      #fcid-logo-wrap {
+        position: absolute !important;
+        right: 16px;
+        top: 0;
+        bottom: 0;
+        display: flex !important;
+        align-items: center;
+        pointer-events: none;
+      }
+      #fcid-logo { height: 68px; opacity: 0.92; }
       .navbar .container-fluid {
         display: flex !important;
         flex-wrap: wrap !important;
@@ -1319,7 +1337,7 @@ ui <- page_navbar(
   theme = bs_theme(primary = "#007B8A", version = 5),
   bg = "#007B8A",
 
-  nav_panel(HTML("🗺️ Land Use"),
+  nav_panel(HTML("&#x1F33F; Land Use"),
     layout_sidebar(
       sidebar = sidebar(
         selectInput("class_sel", "Landuse Class",
@@ -1476,6 +1494,13 @@ ui <- page_navbar(
         ),
         uiOutput("maps_ui")
       )
+    )
+  ),
+
+  nav_item(
+    tags$div(
+      id = "fcid-logo-wrap",
+      tags$img(src = "images/fcidlogo.png", id = "fcid-logo")
     )
   )
 )
@@ -2036,8 +2061,20 @@ server <- function(input, output, session) {
       label    <- sub(" → ", "_to_", var_sel)
       rel_path <- sprintf("maps/%s/transitions/transition_%s_%s.png", sc_dir, label, year)
     }
-    disk_path <- paste0("data/", rel_path)
-    if (file.exists(disk_path)) {
+    disk_path    <- paste0("data/", rel_path)
+    nodiff_path  <- sub("\\.png$", ".nodiff", disk_path)
+    if (sc_dir == "diff" && file.exists(nodiff_path)) {
+      div(style = paste("display:flex; flex-direction:column; align-items:center;",
+                        "justify-content:center;",
+                        "aspect-ratio:820/780; width:100%; max-height:calc(100vh - 210px);",
+                        "border:1px solid #ddd; border-radius:4px;",
+                        "background:white; color:#555;",
+                        "font-size:0.9rem; text-align:center; padding:1rem;"),
+          tags$div(style = "font-size:2.2rem; margin-bottom:0.4rem;", HTML("&#x2261;")),
+          tags$p(style = "margin:0; font-weight:600;", "No difference"),
+          tags$p(style = "margin:0.25rem 0 0 0; font-size:0.8rem; color:#888;",
+                 "CT and NDC are identical for this variable and year."))
+    } else if (file.exists(disk_path)) {
       tags$img(src   = rel_path,
                class = "maps-img",
                style = "border:1px solid #ddd; border-radius:4px;",

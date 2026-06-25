@@ -187,6 +187,7 @@ run_scenario <- function(sc) {
       plot(r,
            col    = pal,
            breaks = scale_breaks,
+           legend = "bottomright",
            mar    = c(1.5, 0.5, 4, 0.5),
            plg    = list(title = "1000 ha", cex = 0.8))
       title(main = sprintf("%s\nLoss of %s | %d | Total: %.2f Mha", sc$label, cls, yr, total_mha),
@@ -218,6 +219,7 @@ run_scenario <- function(sc) {
       plot(r,
            col    = tr$pal,
            breaks = scale_breaks,
+           legend = "bottomright",
            mar    = c(1.5, 0.5, 4, 0.5),
            plg    = list(title = "1000 ha", cex = 0.8))
       title(main = sprintf("%s\n%s -> %s | %d | Total: %.2f Mha", sc$label, tr$from, tr$to, yr, total_mha),
@@ -264,6 +266,13 @@ run_diff <- function() {
   years <- sort(unique(luc_ct$year))
 
   plot_diff <- function(r_diff, title_text, out_file) {
+    mm <- as.numeric(minmax(r_diff, compute = TRUE))
+    if (is.finite(mm[1]) && mm[1] == mm[2]) {
+      writeLines(character(0), sub("\\.png$", ".nodiff", out_file))
+      cat("  No diff:", sub("\\.png$", ".nodiff", out_file), "\n")
+      return(invisible(NULL))
+    }
+
     png(out_file, width = 820, height = 780, res = 100)
     plot(r_diff,
          col    = diff_pal,
