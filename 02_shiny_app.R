@@ -2062,8 +2062,9 @@ server <- function(input, output, session) {
       input$map_class
     }
     fluidRow(
-      column(6, make_map_img("ct",  type_sel, var_sel, year)),
-      column(6, make_map_img("ndc", type_sel, var_sel, year))
+      column(4, make_map_img("ct",   type_sel, var_sel, year)),
+      column(4, make_map_img("ndc",  type_sel, var_sel, year)),
+      column(4, make_map_img("diff", type_sel, var_sel, year))
     )
   })
 }

@@ -4,9 +4,9 @@
 # =============================================================================
 #
 # Usage:
-#   Rscript 04_generate_maps.R          # both scenarios
-#   Rscript 04_generate_maps.R ct       # Current Trends only
-#   Rscript 04_generate_maps.R ndc      # NDC Commitments only
+#   Rscript 04_generate_maps.R          # both scenarios + difference
+#   Rscript 04_generate_maps.R ct       # Current Trends only + difference
+#   Rscript 04_generate_maps.R ndc      # NDC Commitments only + difference
 #
 # Input:
 #   data/luc/downscaled_LUC_brazil_all_ct.rds
@@ -21,6 +21,9 @@
 #                              transition_<From>_to_<To>_<year>.png
 #   data/maps/ndc/landcover/
 #   data/maps/ndc/transitions/
+#   data/maps/diff/landcover/  landcover_<Class>_<year>.png  (NDC - CT, diverging)
+#   data/maps/diff/transitions/ outflow_<Class>_<year>.png
+#                               transition_<From>_to_<To>_<year>.png
 #
 # Required packages:
 #   install.packages(c("terra", "dplyr", "RColorBrewer"))
@@ -75,6 +78,10 @@ key_transitions <- list(
   list(from = "Pasture",   to = "Cropland",  pal = brewer.pal(9, "Reds")),
   list(from = "OtherLand", to = "Cropland",  pal = brewer.pal(9, "Reds"))
 )
+
+# Difference map (NDC - CT): diverging RdBu, blue = NDC more, red = NDC less
+diff_ceil <- 150   # 1000 ha symmetric scale; adjust if needed
+diff_pal  <- brewer.pal(11, "RdBu")
 
 # =============================================================================
 # 1.  Shared spatial objects
@@ -219,9 +226,117 @@ run_scenario <- function(sc) {
 }
 
 # =============================================================================
-# 4.  Run
+# 4.  Difference maps (NDC - CT)
+# =============================================================================
+
+load_luc <- function(rds_path) {
+  readRDS(rds_path) |>
+    rename(year = times) |>
+    mutate(
+      id_c = ifelse(grepl("_a$", ns),
+                    as.numeric(sub("_a$", "", ns)) + 1e6,
+                    as.numeric(ns)),
+      year = as.integer(year)
+    )
+}
+
+run_diff <- function() {
+
+  cat("\n============================================================\n")
+  cat(" Difference maps (NDC - CT)\n")
+  cat(" Output:   data/maps/diff\n")
+  cat("============================================================\n")
+
+  dir_diff <- "data/maps/diff"
+  dir.create(file.path(dir_diff, "landcover"),   showWarnings = FALSE, recursive = TRUE)
+  dir.create(file.path(dir_diff, "transitions"), showWarnings = FALSE, recursive = TRUE)
+
+  luc_ct  <- load_luc("data/luc/downscaled_LUC_brazil_all_ct.rds")
+  luc_ndc <- load_luc("data/luc/downscaled_LUC_brazil_all_ndc.rds")
+
+  years <- sort(unique(luc_ct$year))
+
+  plot_diff <- function(r_diff, title_text, out_file) {
+    png(out_file, width = 820, height = 780, res = 100)
+    plot(r_diff,
+         col    = diff_pal,
+         range  = c(-diff_ceil, diff_ceil),
+         legend = "bottomright",
+         mar    = c(1.5, 0.5, 4, 0.5),
+         plg    = list(title = "1000 ha", cex = 0.8))
+    title(main = title_text, adj = 1, cex.main = 0.9)
+    terra::plot(brazil_states, border = "lightgray", lwd = 0.1, add = TRUE)
+    terra::plot(brazil_biomes, border = "black",     lwd = 1,   add = TRUE)
+    dev.off()
+    cat("  Saved:", out_file, "\n")
+  }
+
+  # --- Part 1: Land Cover ---
+  cat("\n--- Part 1: Land Cover ---\n")
+
+  for (cls in luc_classes) {
+    for (yr in years) {
+      df_ct  <- luc_ct  |> filter(lu.to == cls, year == yr) |>
+                group_by(id_c) |> summarise(value = sum(value) * 0.1, .groups = "drop")
+      df_ndc <- luc_ndc |> filter(lu.to == cls, year == yr) |>
+                group_by(id_c) |> summarise(value = sum(value) * 0.1, .groups = "drop")
+
+      r_diff    <- to_raster(df_ndc) - to_raster(df_ct)
+      delta_mha <- (sum(df_ndc$value) - sum(df_ct$value)) / 1000
+
+      plot_diff(r_diff,
+                sprintf("Difference (NDC - CT)\n%s | %d | %+.2f Mha", cls, yr, delta_mha),
+                file.path(dir_diff, "landcover", sprintf("landcover_%s_%d.png", cls, yr)))
+    }
+  }
+
+  # --- Part 2a: Outflows ---
+  cat("\n--- Part 2a: Outflows ---\n")
+
+  for (cls in luc_classes) {
+    for (yr in years) {
+      df_ct  <- luc_ct  |> filter(lu.from == cls, lu.to != cls, year == yr) |>
+                group_by(id_c) |> summarise(value = sum(value) * 0.1, .groups = "drop")
+      df_ndc <- luc_ndc |> filter(lu.from == cls, lu.to != cls, year == yr) |>
+                group_by(id_c) |> summarise(value = sum(value) * 0.1, .groups = "drop")
+
+      r_diff    <- to_raster(df_ndc) - to_raster(df_ct)
+      delta_mha <- (sum(df_ndc$value) - sum(df_ct$value)) / 1000
+
+      plot_diff(r_diff,
+                sprintf("Difference (NDC - CT)\nLoss of %s | %d | %+.2f Mha", cls, yr, delta_mha),
+                file.path(dir_diff, "transitions", sprintf("outflow_%s_%d.png", cls, yr)))
+    }
+  }
+
+  # --- Part 2b: Key transitions ---
+  cat("\n--- Part 2b: Key transitions ---\n")
+
+  for (tr in key_transitions) {
+    label <- sprintf("%s_to_%s", tr$from, tr$to)
+    for (yr in years) {
+      df_ct  <- luc_ct  |> filter(lu.from == tr$from, lu.to == tr$to, year == yr) |>
+                group_by(id_c) |> summarise(value = sum(value) * 0.1, .groups = "drop")
+      df_ndc <- luc_ndc |> filter(lu.from == tr$from, lu.to == tr$to, year == yr) |>
+                group_by(id_c) |> summarise(value = sum(value) * 0.1, .groups = "drop")
+
+      r_diff    <- to_raster(df_ndc) - to_raster(df_ct)
+      delta_mha <- (sum(df_ndc$value) - sum(df_ct$value)) / 1000
+
+      plot_diff(r_diff,
+                sprintf("Difference (NDC - CT)\n%s -> %s | %d | %+.2f Mha", tr$from, tr$to, yr, delta_mha),
+                file.path(dir_diff, "transitions", sprintf("transition_%s_%d.png", label, yr)))
+    }
+  }
+
+  cat("\nDifference maps done.\n")
+}
+
+# =============================================================================
+# 5.  Run
 # =============================================================================
 
 for (sc in scenarios) run_scenario(sc)
+run_diff()
 
 cat("\nAll done.\n")

@@ -1,6 +1,6 @@
 #!/bin/bash
 cd "$(dirname "$0")"
-if [ ! -f "data/maps/ct/landcover/landcover_Forest_2020.png" ]; then
+if [ ! -f "data/maps/diff/landcover/landcover_Forest_2020.png" ]; then
     echo "Maps not found. Generating maps..."
     Rscript 04_generate_maps.R
     if [ $? -ne 0 ]; then
