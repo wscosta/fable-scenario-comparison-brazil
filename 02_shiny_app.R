@@ -68,6 +68,13 @@ COL_HIST <- "#000000"
 COL_CT   <- "#1565C0"
 COL_NDC  <- "#009C3B"
 
+hex_to_rgba <- function(hex, alpha = 0.25) {
+  r <- strtoi(substr(hex, 2, 3), 16L)
+  g <- strtoi(substr(hex, 4, 5), 16L)
+  b <- strtoi(substr(hex, 6, 7), 16L)
+  sprintf("rgba(%d,%d,%d,%.2f)", r, g, b, alpha)
+}
+
 # ── Shared layout helper ──────────────────────────────────────────────────────
 base_layout <- function(p, title_text, title_color = "black", x_max, y_range,
                         y_label = "Area (Mha)", barmode = NULL, x_min = 2000L,
@@ -156,6 +163,12 @@ add_hist_trace <- function(p, hist_data, source_label, chart_type = "Line chart"
               marker = list(color = "#1a1a1a",
                             line  = list(color = "black", width = 1)),
               hovertemplate = hover)
+  } else if (chart_type == "Area chart") {
+    add_trace(p, data = hist_data, x = ~year, y = ~value,
+              type = "scatter", mode = "lines",
+              name = trace_name,
+              line = list(color = "black", width = 1.5, dash = "dash"),
+              hovertemplate = hover)
   } else {
     add_trace(p, data = hist_data, x = ~year, y = ~value,
               type = "scatter", mode = "lines+markers",
@@ -193,6 +206,21 @@ make_combined_plot <- function(class_name, x_max, y_range, chart_type = "Line ch
                 type = "bar", name = "NDC Commitments",
                 marker = list(color = COL_NDC,
                               line  = list(color = "black", width = 1)),
+                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>NDC Commitments</extra>") %>%
+      add_hist_trace(hist_data, source_label, chart_type)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct, x = ~year, y = ~value,
+                type = "scatter", mode = "lines", fill = "tozeroy",
+                fillcolor = hex_to_rgba(COL_CT, 0.25),
+                name = "Current Trends",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>Current Trends</extra>") %>%
+      add_trace(data = ndc, x = ~year, y = ~value,
+                type = "scatter", mode = "lines", fill = "tozeroy",
+                fillcolor = hex_to_rgba(COL_NDC, 0.25),
+                name = "NDC Commitments",
+                line = list(color = "black", width = 1.5),
                 hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>NDC Commitments</extra>") %>%
       add_hist_trace(hist_data, source_label, chart_type)
   } else {
@@ -237,6 +265,15 @@ make_single_plot <- function(class_name, scenario_name, bar_color, x_max, y_rang
                 type = "bar", name = scenario_name,
                 marker = list(color = bar_color,
                               line  = list(color = "black", width = 1)),
+                hovertemplate = hover) %>%
+      add_hist_trace(hist_data, source_label, chart_type)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value,
+                type = "scatter", mode = "lines", fill = "tozeroy",
+                fillcolor = hex_to_rgba(bar_color, 0.25),
+                name = scenario_name,
+                line = list(color = "black", width = 1.5),
                 hovertemplate = hover) %>%
       add_hist_trace(hist_data, source_label, chart_type)
   } else {
@@ -462,6 +499,18 @@ make_crop_combined_plot <- function(crop_name, type_sel, x_max, y_range, chart_t
       add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
                 marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
                 hovertemplate = hover("NDC Commitments"))
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
+                name = "Current Trends",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
+                name = "NDC Commitments",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("NDC Commitments"))
   } else {
     p <- plot_ly() %>%
       add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
@@ -492,6 +541,13 @@ make_crop_single_plot <- function(crop_name, type_sel, scenario_name, bar_color,
     p <- plot_ly() %>%
       add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
                 marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
+                name = scenario_name,
+                line = list(color = "black", width = 1.5),
                 hovertemplate = hover_tmpl)
   } else {
     p <- plot_ly() %>%
@@ -659,6 +715,18 @@ make_live_combined_plot <- function(product, x_max, y_range, chart_type) {
       add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
                 marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
                 hovertemplate = hover("NDC Commitments"))
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
+                name = "Current Trends",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
+                name = "NDC Commitments",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("NDC Commitments"))
   } else {
     p <- plot_ly() %>%
       add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
@@ -689,6 +757,13 @@ make_live_single_plot <- function(product, scenario_name, bar_color, x_max, y_ra
     p <- plot_ly() %>%
       add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
                 marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
+                name = scenario_name,
+                line = list(color = "black", width = 1.5),
                 hovertemplate = hover_tmpl)
   } else {
     p <- plot_ly() %>%
@@ -838,6 +913,18 @@ make_trade_combined_plot <- function(trade_type, product, x_max, y_range, chart_
       add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
                 marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
                 hovertemplate = hover("NDC Commitments"))
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
+                name = "Current Trends",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
+                name = "NDC Commitments",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("NDC Commitments"))
   } else {
     p <- plot_ly() %>%
       add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
@@ -863,6 +950,13 @@ make_trade_single_plot <- function(trade_type, product, scenario_name, bar_color
     p <- plot_ly() %>%
       add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
                 marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
+                name = scenario_name,
+                line = list(color = "black", width = 1.5),
                 hovertemplate = hover_tmpl)
   } else {
     p <- plot_ly() %>%
@@ -941,6 +1035,18 @@ make_food_combined_plot <- function(variable, x_max, y_range, chart_type) {
       add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
                 marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
                 hovertemplate = hover("NDC Commitments"))
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
+                name = "Current Trends",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
+                name = "NDC Commitments",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("NDC Commitments"))
   } else {
     p <- plot_ly() %>%
       add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
@@ -966,6 +1072,13 @@ make_food_single_plot <- function(variable, scenario_name, bar_color, x_max, y_r
     p <- plot_ly() %>%
       add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
                 marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
+                name = scenario_name,
+                line = list(color = "black", width = 1.5),
                 hovertemplate = hover_tmpl)
   } else {
     p <- plot_ly() %>%
@@ -1098,6 +1211,18 @@ make_emiss_combined_plot <- function(emiss_name, x_max, y_range, chart_type) {
       add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
                 marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
                 hovertemplate = hover("NDC Commitments"))
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
+                name = "Current Trends",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("Current Trends")) %>%
+      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
+                name = "NDC Commitments",
+                line = list(color = "black", width = 1.5),
+                hovertemplate = hover("NDC Commitments"))
   } else {
     p <- plot_ly() %>%
       add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
@@ -1128,6 +1253,13 @@ make_emiss_single_plot <- function(emiss_name, scenario_name, bar_color, x_max, 
     p <- plot_ly() %>%
       add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
                 marker = list(color = bar_color, line = list(color = "black", width = 1)),
+                hovertemplate = hover_tmpl)
+  } else if (chart_type == "Area chart") {
+    p <- plot_ly() %>%
+      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
+                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
+                name = scenario_name,
+                line = list(color = "black", width = 1.5),
                 hovertemplate = hover_tmpl)
   } else {
     p <- plot_ly() %>%
@@ -1214,6 +1346,7 @@ make_emiss_rel_diff_colored <- function(emiss_name, scenario_sel) {
 
 # ── Static assets ─────────────────────────────────────────────────────────────
 addResourcePath("images", normalizePath("data/images", mustWork = FALSE))
+addResourcePath("maps",   normalizePath("data/maps",   mustWork = FALSE))
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 ui <- page_navbar(
@@ -1221,7 +1354,25 @@ ui <- page_navbar(
   window_title = "FABLE-Calculator Brazil v50",
   header = tags$head(
     tags$link(rel = "icon", type = "image/svg+xml", href = "images/favicon.svg"),
+    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Raleway:wght@600&family=Montserrat:wght@400;500&display=swap"),
     tags$style(HTML("
+      .navbar { background: linear-gradient(90deg, #2E7D32 0%, #C8A000 25%, #002776 50%, #C8A000 75%, #2E7D32 100%) !important; }
+      .navbar-brand, .navbar .nav-link, .navbar .navbar-text { text-shadow: 0 1px 3px rgba(0,0,0,0.55) !important; }
+      .navbar-brand span { font-family: 'Raleway', sans-serif !important; font-weight: 600 !important; letter-spacing: 0.02em; }
+      .navbar .nav-link  { font-family: 'Montserrat', sans-serif !important; font-weight: 500 !important; letter-spacing: 0.01em; }
+      .navbar .nav-link         { color: rgba(255,255,255,0.85) !important; }
+      .navbar .nav-link:hover   { color: rgba(255,255,255,0.97) !important; }
+      .navbar .nav-link.active  { color: rgba(255,255,255,1.00) !important; }
+      #fcid-logo-wrap {
+        position: absolute !important;
+        right: 16px;
+        top: 0;
+        bottom: 0;
+        display: flex !important;
+        align-items: center;
+        pointer-events: none;
+      }
+      #fcid-logo { height: 68px; opacity: 0.92; }
       .navbar .container-fluid {
         display: flex !important;
         flex-wrap: wrap !important;
@@ -1255,12 +1406,70 @@ ui <- page_navbar(
       .selectize-dropdown {
         font-size: 0.8rem !important;
       }
+      /* Maps tab — year button-group */
+      #map_year.shiny-input-container { margin-bottom: 0; }
+      #map_prev_year, #map_next_year {
+        font-size: 0.9rem !important;
+        line-height: 1.4;
+        padding: 5px 10px;
+      }
+      #map_year .shiny-options-group {
+        display: inline-flex !important;
+        border: 1.5px solid #007B8A;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      #map_year .radio,
+      #map_year .radio-inline,
+      #map_year .form-check {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #map_year input[type='radio'] {
+        position: absolute !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #map_year label,
+      #map_year .form-check-label {
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block;
+      }
+      #map_year label span {
+        display: block;
+        padding: 5px 14px;
+        cursor: pointer;
+        background: white;
+        color: #007B8A;
+        font-weight: 500;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        line-height: 1.4;
+      }
+      #map_year label:hover span { background: #e0f2f4; }
+      #map_year input[type='radio']:checked + span {
+        background: #007B8A;
+        color: white;
+      }
+      /* Maps tab — images fit viewport */
+      .maps-img {
+        display: block;
+        margin: 0 auto;
+        max-width: 100%;
+        max-height: calc(100vh - 210px);
+        width: auto;
+        height: auto;
+      }
     "))
   ),
   theme = bs_theme(primary = "#007B8A", version = 5),
   bg = "#007B8A",
 
-  nav_panel(HTML("🗺️ Land Use"),
+  nav_panel(HTML("&#x1F33F; Land Use"),
     layout_sidebar(
       sidebar = sidebar(
         selectInput("class_sel", "Landuse Class",
@@ -1273,7 +1482,7 @@ ui <- page_navbar(
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
         radioButtons("chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart"),
+                    choices  = c("Line chart", "Bar chart", "Area chart"),
                     selected = "Line chart"),
         checkboxInput("zero_base", "Start y-axis at zero", value = TRUE)
       ),
@@ -1294,7 +1503,7 @@ ui <- page_navbar(
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
         radioButtons("emiss_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart"),
+                    choices  = c("Line chart", "Bar chart", "Area chart"),
                     selected = "Line chart"),
         checkboxInput("emiss_zero_base", "Start y-axis at zero", value = FALSE)
       ),
@@ -1318,7 +1527,7 @@ ui <- page_navbar(
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
         radioButtons("crop_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart"),
+                    choices  = c("Line chart", "Bar chart", "Area chart"),
                     selected = "Line chart"),
         checkboxInput("crop_zero_base", "Start y-axis at zero", value = TRUE)
       ),
@@ -1341,7 +1550,7 @@ ui <- page_navbar(
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
         radioButtons("live_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart"),
+                    choices  = c("Line chart", "Bar chart", "Area chart"),
                     selected = "Line chart"),
         checkboxInput("live_zero_base", "Start y-axis at zero", value = TRUE)
       ),
@@ -1366,7 +1575,7 @@ ui <- page_navbar(
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
         radioButtons("trade_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart"),
+                    choices  = c("Line chart", "Bar chart", "Area chart"),
                     selected = "Line chart"),
         checkboxInput("trade_zero_base", "Start y-axis at zero", value = TRUE)
       ),
@@ -1387,11 +1596,43 @@ ui <- page_navbar(
                     choices  = c("Calibration & Projections", "Calibration"),
                     selected = "Calibration & Projections"),
         radioButtons("food_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart"),
+                    choices  = c("Line chart", "Bar chart", "Area chart"),
                     selected = "Line chart"),
         checkboxInput("food_zero_base", "Start y-axis at zero", value = TRUE)
       ),
       uiOutput("food_charts_ui")
+    )
+  ),
+  nav_panel(HTML("🌎 Maps"),
+    layout_sidebar(
+      sidebar = sidebar(
+        radioButtons("map_type", "Map Type",
+                     choices  = c("Land Cover", "Outflows", "Transitions"),
+                     selected = "Land Cover"),
+        uiOutput("map_var_ui")
+      ),
+      tagList(
+        div(style = "display:flex; align-items:center; justify-content:center; gap:12px; padding:6px 0 10px 0;",
+          actionButton("map_prev_year", HTML("&#9664;"),
+                       class = "btn btn-primary btn-sm",
+                       style = "padding:4px 10px; font-size:1rem;"),
+          radioButtons("map_year", NULL,
+                       choices  = as.character(seq(2020, 2050, 5)),
+                       selected = "2020",
+                       inline   = TRUE),
+          actionButton("map_next_year", HTML("&#9654;"),
+                       class = "btn btn-primary btn-sm",
+                       style = "padding:4px 10px; font-size:1rem;")
+        ),
+        uiOutput("maps_ui")
+      )
+    )
+  ),
+
+  nav_item(
+    tags$div(
+      id = "fcid-logo-wrap",
+      tags$img(src = "images/fcidlogo.png", id = "fcid-logo")
     )
   )
 )
@@ -1912,6 +2153,88 @@ server <- function(input, output, session) {
   })
   output$emiss_plot_ndc <- renderPlotly({
     make_emiss_single_plot(input$emiss_sel, "NDC Commitments", COL_NDC, emiss_x_max(), emiss_y_range(), input$emiss_chart_type)
+  })
+
+  # ── Maps tab ──────────────────────────────────────────────────────────────────
+
+  map_years_vec <- as.character(seq(2020, 2050, 5))
+
+  observeEvent(input$map_prev_year, {
+    idx <- which(map_years_vec == input$map_year)
+    if (idx > 1) updateRadioButtons(session, "map_year", selected = map_years_vec[idx - 1])
+  })
+
+  observeEvent(input$map_next_year, {
+    idx <- which(map_years_vec == input$map_year)
+    if (idx < length(map_years_vec))
+      updateRadioButtons(session, "map_year", selected = map_years_vec[idx + 1])
+  })
+
+  output$map_var_ui <- renderUI({
+    if (input$map_type == "Transitions") {
+      radioButtons("map_transition", "Transition",
+                   choices  = c("Forest → Cropland", "Forest → Pasture",
+                                "Cropland → Forest", "Pasture → Cropland",
+                                "OtherLand → Cropland"),
+                   selected = "Forest → Cropland")
+    } else {
+      radioButtons("map_class", "Class",
+                   choices  = c("Forest", "Cropland", "Pasture", "OtherLand", "Urban"),
+                   selected = "Forest")
+    }
+  })
+
+  make_map_img <- function(sc_dir, type_sel, var_sel, year) {
+    if (type_sel == "Land Cover") {
+      rel_path <- sprintf("maps/%s/landcover/landcover_%s_%s.png", sc_dir, var_sel, year)
+    } else if (type_sel == "Outflows") {
+      rel_path <- sprintf("maps/%s/transitions/outflow_%s_%s.png",  sc_dir, var_sel, year)
+    } else {
+      label    <- sub(" → ", "_to_", var_sel)
+      rel_path <- sprintf("maps/%s/transitions/transition_%s_%s.png", sc_dir, label, year)
+    }
+    disk_path    <- paste0("data/", rel_path)
+    nodiff_path  <- sub("\\.png$", ".nodiff", disk_path)
+    if (sc_dir == "diff" && file.exists(nodiff_path)) {
+      div(style = paste("display:flex; flex-direction:column; align-items:center;",
+                        "justify-content:center;",
+                        "aspect-ratio:820/780; width:100%; max-height:calc(100vh - 210px);",
+                        "border:1px solid #ddd; border-radius:4px;",
+                        "background:white; color:#555;",
+                        "font-size:0.9rem; text-align:center; padding:1rem;"),
+          tags$div(style = "font-size:2.2rem; margin-bottom:0.4rem;", HTML("&#x2261;")),
+          tags$p(style = "margin:0; font-weight:600;", "No difference"),
+          tags$p(style = "margin:0.25rem 0 0 0; font-size:0.8rem; color:#888;",
+                 "CT and NDC are identical for this variable and year."))
+    } else if (file.exists(disk_path)) {
+      tags$img(src   = rel_path,
+               class = "maps-img",
+               style = "border:1px solid #ddd; border-radius:4px;",
+               alt   = paste(sc_dir, type_sel, var_sel, year))
+    } else {
+      div(style = paste("display:flex; align-items:center; justify-content:center;",
+                        "height:300px; border:1px dashed #bbb; border-radius:4px;",
+                        "background:#f8f8f8; color:#888; font-size:0.85rem; text-align:center; padding:1rem;"),
+          tags$p("Maps not generated yet.", tags$br(),
+                 tags$code("Rscript 04_generate_maps.R")))
+    }
+  }
+
+  output$maps_ui <- renderUI({
+    type_sel <- input$map_type
+    year     <- input$map_year
+    var_sel  <- if (type_sel == "Transitions") {
+      req(input$map_transition)
+      input$map_transition
+    } else {
+      req(input$map_class)
+      input$map_class
+    }
+    fluidRow(
+      column(4, make_map_img("ct",   type_sel, var_sel, year)),
+      column(4, make_map_img("ndc",  type_sel, var_sel, year)),
+      column(4, make_map_img("diff", type_sel, var_sel, year))
+    )
   })
 }
 

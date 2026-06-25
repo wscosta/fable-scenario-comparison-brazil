@@ -23,6 +23,8 @@ R (≥ 4.1) with the following packages:
 | `shiny` | Web app framework |
 | `plotly` | Interactive charts |
 | `bslib` | Bootstrap 5 theming |
+| `terra` | Raster processing and map generation |
+| `RColorBrewer` | Colour palettes for maps |
 | `ggplot2` | Static charts (report only) |
 | `officer` | Word document generation (report only) |
 | `flextable` | Formatted tables in Word (report only) |
@@ -31,6 +33,7 @@ Install all at once from the R console:
 
 ```r
 install.packages(c("readxl", "dplyr", "tidyr", "shiny", "plotly", "bslib",
+                   "terra", "RColorBrewer",
                    "ggplot2", "officer", "flextable"))
 ```
 
@@ -44,19 +47,21 @@ Double-click the file for your operating system to start the app directly — no
 | **macOS** | `open_app_mac.command` | First time: right-click → Open (Gatekeeper). After that, double-click works. If it still doesn't run, open a terminal in the project folder and run `chmod +x open_app_mac.command` once. |
 | **Ubuntu** | `open_app_ubuntu.sh` | In Nautilus: Edit → Preferences → Behaviour → "Run executable text files when they are opened". Then double-click. Alternatively, right-click → Run as a Program. If needed, run `chmod +x open_app_ubuntu.sh` once in a terminal first. |
 
-All three launchers auto-detect their own location and open the browser automatically on first run.
+All three launchers auto-detect their own location and open the browser automatically on first run. If the downscaling maps have not been generated yet, the launcher runs `04_generate_maps.R` automatically before opening the app (this takes a few minutes on first run).
 
 ## 📂 Input data files
 
-Three files are required before running the app:
-
 | File | Location | Description |
 |------|----------|-------------|
-| FABLE Calculator — Current Trends | `data/xlsx/` | FABLE Calculator spreadsheet with the **Current Trends** pathway selected |
-| FABLE Calculator — NDC Commitments | `data/xlsx/` | FABLE Calculator spreadsheet with the **NDC Commitments** pathway selected |
+| FABLE Calculator — Current Trends | `data/xlsx/` | FABLE Calculator spreadsheet (Current Trends pathway) |
+| FABLE Calculator — NDC Commitments | `data/xlsx/` | FABLE Calculator spreadsheet (NDC Commitments pathway) |
 | Historical reference data | `data/csv/` | Long-format CSV (`histdatabrazil.csv`) with observed data for Brazil |
+| LUC transition matrix — CT | `data/luc/` | Downscaled land-use change data for Current Trends (`downscaled_LUC_brazil_all_ct.rds`) |
+| LUC transition matrix — NDC | `data/luc/` | Downscaled land-use change data for NDC Commitments (`downscaled_LUC_brazil_all_ndc.rds`) |
+| Cell ID raster | `data/luc/` | `id_raster.tif` — maps FABLE cell IDs to a 0.05° raster grid |
+| State and biome boundaries | `data/shapefiles/` | `br_states.shp`, `br_biomes.shp` — shapefile overlays for maps |
 
-File names are configured at the top of `01_process_data.R`.
+File names for the FABLE Calculator spreadsheets are configured at the top of `01_process_data.R`.
 
 ## 📁 Repository structure
 
@@ -67,13 +72,29 @@ fable-scenario-comparison-brazil/
 │   │   └── histdatabrazil.csv               # Historical observations (1995–2020)
 │   ├── images/
 │   │   ├── fable_logo.png                   # Navbar logo
+│   │   ├── fcidlogo.png                     # FCID logo (pinned right of navbar)
 │   │   └── favicon.svg                      # Browser tab icon (Brazil flag)
+│   ├── luc/
+│   │   ├── downscaled_LUC_brazil_all_ct.rds # LUC transition matrix — Current Trends
+│   │   ├── downscaled_LUC_brazil_all_ndc.rds# LUC transition matrix — NDC Commitments
+│   │   └── id_raster.tif                    # Cell ID raster (0.05° resolution)
+│   ├── maps/                                # Auto-generated PNGs (gitignored)
+│   │   ├── ct/
+│   │   │   ├── landcover/
+│   │   │   └── transitions/
+│   │   └── ndc/
+│   │       ├── landcover/
+│   │       └── transitions/
+│   ├── shapefiles/
+│   │   ├── br_states.shp                    # Brazilian state boundaries
+│   │   └── br_biomes.shp                    # Brazilian biome boundaries
 │   └── xlsx/
 │       ├── FABLECalculator_BRA_UP50_CurrentTrends.xlsx
 │       └── FABLECalculator_BRA_UP50_NDC.xlsx
 ├── 01_process_data.R                        # Data ingestion and processing
 ├── 02_shiny_app.R                           # Shiny app logic
-├── 03_generate_report.R                     # Word report generator (all "Both" charts)
+├── 03_generate_report.R                     # Word report generator
+├── 04_generate_maps.R                       # PNG map generator (downscaling)
 ├── app.R                                    # Entry point (sources 02_shiny_app.R)
 ├── open_app_windows.bat                     # Windows one-click launcher
 ├── open_app_mac.command                     # macOS one-click launcher
@@ -153,9 +174,17 @@ source("01_process_data.R")
 
 ## 🎨 UI theme
 
-The app uses **Bootstrap 5** via the `bslib` package. The navbar displays in two rows — app title on the first line and tab names on the second — with a turquoise background (`#007B8A`) and white text. Interactive elements (active tabs, focused inputs, buttons) use the same turquoise accent.
+The app uses **Bootstrap 5** via the `bslib` package. The navbar displays in two rows — app title on the first line and tab names on the second. The navbar background is a five-stop Brazil flag gradient (`#2E7D32 → #C8A000 → #002776 → #C8A000 → #2E7D32`) with white text and a subtle drop shadow. The FCID logo is pinned to the right of the navbar spanning both rows. The title uses **Raleway** (bold) and the tab labels use **Montserrat** (medium), both loaded from Google Fonts. Interactive elements (active tabs, focused inputs, buttons) use the turquoise accent (`#007B8A`).
 
 Controls are grouped in a **sidebar panel** on the left of each tab. Scenario, Years, and Chart type are shown as radio buttons; the variable selector (land-use class, emission type, crop, etc.) uses a dropdown. Sidebar labels are bold without trailing colons. A **Start y-axis at zero** checkbox controls whether the y-axis is forced to start at zero (checked by default) or auto-scaled to the data range. For CO₂ AFOLU, the checkbox is unchecked by default and resets automatically when switching to that emission, since its values can be negative.
+
+All tabs support three **Chart types**:
+
+| Type | Description |
+|------|-------------|
+| **Line chart** | Lines with markers; scenario colours (blue CT, green NDC); historical in black |
+| **Bar chart** | Grouped bars with black border; historical in near-black (`#1a1a1a`) |
+| **Area chart** | Filled area to y = 0; semi-transparent fill (25% opacity) in scenario colours; black border line; historical as dashed black line without fill |
 
 ## 📊 Shiny app — Land Use tab
 
@@ -341,6 +370,43 @@ In addition to production (Mt) for Beef, Milk, Chicken and Pork, the Livestock t
 | Cattle Stocking Rate | `RumDensity` | TLU/ha | `5_feas_livestock`, cattle rows (same value across sub-types, first taken) |
 
 Neither variable has a historical series — the chart shows scenario lines only with no difference tables.
+
+## 🌎 Shiny app — Maps tab
+
+Displays static PNG maps generated from the FABLE downscaling model for both scenarios side by side.
+
+| Control | Options |
+|---------|---------|
+| **Map Type** | Land Cover · Outflows · Transitions |
+| **Class / Transition** | Depends on Map Type (see below) |
+| **Year** | 2020 · 2025 · 2030 · 2035 · 2040 · 2045 · 2050 |
+
+The year selector appears as a navigation bar above the maps with `◀` / `▶` arrow buttons. Three maps are shown side by side — **Current Trends**, **NDC Commitments**, and **Difference (NDC − CT)**. Images are sized to fit the browser viewport without scrolling.
+
+### Map types
+
+| Type | Description | Classes / pairs |
+|------|-------------|-----------------|
+| **Land Cover** | Total area per class per year | Forest · Cropland · Pasture · OtherLand · Urban |
+| **Outflows** | Total area lost from each class | Forest · Cropland · Pasture · OtherLand · Urban |
+| **Transitions** | Area converted between two specific classes | Forest→Cropland · Forest→Pasture · Cropland→Forest · Pasture→Cropland · OtherLand→Cropland |
+
+### Difference maps
+
+The Difference column shows **NDC − CT** using a diverging **RdBu** colour scale (±310 × 1 000 ha): blue cells indicate NDC has more area, red cells indicate NDC has less. When the two scenarios are identical for a given variable and year, the app shows a "No difference" placeholder instead of a blank or misleading map.
+
+### Generating maps
+
+Maps are generated by `04_generate_maps.R` and saved to `data/maps/` (gitignored). The launchers regenerate them automatically on first run. To regenerate manually:
+
+```bash
+Rscript 04_generate_maps.R          # both scenarios + difference
+Rscript 04_generate_maps.R ct       # Current Trends only + difference
+Rscript 04_generate_maps.R ndc      # NDC Commitments only + difference
+Rscript 04_generate_maps.R diff     # difference maps only (fastest)
+```
+
+> Interactive (Leaflet-based) maps are planned for a future branch (`downscaling-dynamic`).
 
 ## 🍽️ Shiny app — Food tab
 
