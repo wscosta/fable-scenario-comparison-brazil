@@ -342,6 +342,10 @@ In addition to production (Mt) for Beef, Milk, Chicken and Pork, the Livestock t
 
 Neither variable has a historical series — the chart shows scenario lines only with no difference tables.
 
+## 🌎 Shiny app — Maps tab
+
+> **Under construction** — this tab will display static downscaling maps for Brazil. Interactive (Leaflet-based) maps are planned for a future release.
+
 ## 🍽️ Shiny app — Food tab
 
 | Control | Options |

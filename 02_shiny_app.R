@@ -1393,6 +1393,13 @@ ui <- page_navbar(
       ),
       uiOutput("food_charts_ui")
     )
+  ),
+  nav_panel(HTML("🌎 Maps"),
+    div(
+      style = "display:flex; flex-direction:column; align-items:center; justify-content:center; height:60vh; gap:1rem;",
+      tags$h3("🚧 Under Construction", style = "color:#007B8A; margin:0;"),
+      tags$p("Downscaling maps coming soon.", style = "color:#555; font-size:1rem; margin:0;")
+    )
   )
 )
 
