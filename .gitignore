@@ -7,6 +7,9 @@
 # Generated data (reproduced by 01_process_data.R)
 data/processed/
 
+# Generated maps (reproduced by 04_generate_maps.R)
+data/maps/
+
 # Claude Code
 .claude/
 CLAUDE.md

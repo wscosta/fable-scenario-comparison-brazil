@@ -1214,6 +1214,7 @@ make_emiss_rel_diff_colored <- function(emiss_name, scenario_sel) {
 
 # ── Static assets ─────────────────────────────────────────────────────────────
 addResourcePath("images", normalizePath("data/images", mustWork = FALSE))
+addResourcePath("maps",   normalizePath("data/maps",   mustWork = FALSE))
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 ui <- page_navbar(
@@ -1254,6 +1255,64 @@ ui <- page_navbar(
       .selectize-input,
       .selectize-dropdown {
         font-size: 0.8rem !important;
+      }
+      /* Maps tab — year button-group */
+      #map_year.shiny-input-container { margin-bottom: 0; }
+      #map_prev_year, #map_next_year {
+        font-size: 0.9rem !important;
+        line-height: 1.4;
+        padding: 5px 10px;
+      }
+      #map_year .shiny-options-group {
+        display: inline-flex !important;
+        border: 1.5px solid #007B8A;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      #map_year .radio,
+      #map_year .radio-inline,
+      #map_year .form-check {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #map_year input[type='radio'] {
+        position: absolute !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #map_year label,
+      #map_year .form-check-label {
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block;
+      }
+      #map_year label span {
+        display: block;
+        padding: 5px 14px;
+        cursor: pointer;
+        background: white;
+        color: #007B8A;
+        font-weight: 500;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        line-height: 1.4;
+      }
+      #map_year label:hover span { background: #e0f2f4; }
+      #map_year input[type='radio']:checked + span {
+        background: #007B8A;
+        color: white;
+      }
+      /* Maps tab — images fit viewport */
+      .maps-img {
+        display: block;
+        margin: 0 auto;
+        max-width: 100%;
+        max-height: calc(100vh - 210px);
+        width: auto;
+        height: auto;
       }
     "))
   ),
@@ -1395,10 +1454,28 @@ ui <- page_navbar(
     )
   ),
   nav_panel(HTML("🌎 Maps"),
-    div(
-      style = "display:flex; flex-direction:column; align-items:center; justify-content:center; height:60vh; gap:1rem;",
-      tags$h3("🚧 Under Construction", style = "color:#007B8A; margin:0;"),
-      tags$p("Downscaling maps coming soon.", style = "color:#555; font-size:1rem; margin:0;")
+    layout_sidebar(
+      sidebar = sidebar(
+        radioButtons("map_type", "Map Type",
+                     choices  = c("Land Cover", "Outflows", "Transitions"),
+                     selected = "Land Cover"),
+        uiOutput("map_var_ui")
+      ),
+      tagList(
+        div(style = "display:flex; align-items:center; justify-content:center; gap:12px; padding:6px 0 10px 0;",
+          actionButton("map_prev_year", HTML("&#9664;"),
+                       class = "btn btn-primary btn-sm",
+                       style = "padding:4px 10px; font-size:1rem;"),
+          radioButtons("map_year", NULL,
+                       choices  = as.character(seq(2020, 2050, 5)),
+                       selected = "2020",
+                       inline   = TRUE),
+          actionButton("map_next_year", HTML("&#9654;"),
+                       class = "btn btn-primary btn-sm",
+                       style = "padding:4px 10px; font-size:1rem;")
+        ),
+        uiOutput("maps_ui")
+      )
     )
   )
 )
@@ -1919,6 +1996,75 @@ server <- function(input, output, session) {
   })
   output$emiss_plot_ndc <- renderPlotly({
     make_emiss_single_plot(input$emiss_sel, "NDC Commitments", COL_NDC, emiss_x_max(), emiss_y_range(), input$emiss_chart_type)
+  })
+
+  # ── Maps tab ──────────────────────────────────────────────────────────────────
+
+  map_years_vec <- as.character(seq(2020, 2050, 5))
+
+  observeEvent(input$map_prev_year, {
+    idx <- which(map_years_vec == input$map_year)
+    if (idx > 1) updateRadioButtons(session, "map_year", selected = map_years_vec[idx - 1])
+  })
+
+  observeEvent(input$map_next_year, {
+    idx <- which(map_years_vec == input$map_year)
+    if (idx < length(map_years_vec))
+      updateRadioButtons(session, "map_year", selected = map_years_vec[idx + 1])
+  })
+
+  output$map_var_ui <- renderUI({
+    if (input$map_type == "Transitions") {
+      radioButtons("map_transition", "Transition",
+                   choices  = c("Forest → Cropland", "Forest → Pasture",
+                                "Cropland → Forest", "Pasture → Cropland",
+                                "OtherLand → Cropland"),
+                   selected = "Forest → Cropland")
+    } else {
+      radioButtons("map_class", "Class",
+                   choices  = c("Forest", "Cropland", "Pasture", "OtherLand", "Urban"),
+                   selected = "Forest")
+    }
+  })
+
+  make_map_img <- function(sc_dir, type_sel, var_sel, year) {
+    if (type_sel == "Land Cover") {
+      rel_path <- sprintf("maps/%s/landcover/landcover_%s_%s.png", sc_dir, var_sel, year)
+    } else if (type_sel == "Outflows") {
+      rel_path <- sprintf("maps/%s/transitions/outflow_%s_%s.png",  sc_dir, var_sel, year)
+    } else {
+      label    <- sub(" → ", "_to_", var_sel)
+      rel_path <- sprintf("maps/%s/transitions/transition_%s_%s.png", sc_dir, label, year)
+    }
+    disk_path <- paste0("data/", rel_path)
+    if (file.exists(disk_path)) {
+      tags$img(src   = rel_path,
+               class = "maps-img",
+               style = "border:1px solid #ddd; border-radius:4px;",
+               alt   = paste(sc_dir, type_sel, var_sel, year))
+    } else {
+      div(style = paste("display:flex; align-items:center; justify-content:center;",
+                        "height:300px; border:1px dashed #bbb; border-radius:4px;",
+                        "background:#f8f8f8; color:#888; font-size:0.85rem; text-align:center; padding:1rem;"),
+          tags$p("Maps not generated yet.", tags$br(),
+                 tags$code("Rscript 04_generate_maps.R")))
+    }
+  }
+
+  output$maps_ui <- renderUI({
+    type_sel <- input$map_type
+    year     <- input$map_year
+    var_sel  <- if (type_sel == "Transitions") {
+      req(input$map_transition)
+      input$map_transition
+    } else {
+      req(input$map_class)
+      input$map_class
+    }
+    fluidRow(
+      column(6, make_map_img("ct",  type_sel, var_sel, year)),
+      column(6, make_map_img("ndc", type_sel, var_sel, year))
+    )
   })
 }
 

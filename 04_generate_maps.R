@@ -1,0 +1,227 @@
+# =============================================================================
+# 04_generate_maps.R
+# Generate PNG maps from FABLE downscaled Land Use Change (LUC) data
+# =============================================================================
+#
+# Usage:
+#   Rscript 04_generate_maps.R          # both scenarios
+#   Rscript 04_generate_maps.R ct       # Current Trends only
+#   Rscript 04_generate_maps.R ndc      # NDC Commitments only
+#
+# Input:
+#   data/luc/downscaled_LUC_brazil_all_ct.rds
+#   data/luc/downscaled_LUC_brazil_all_ndc.rds
+#   data/luc/id_raster.tif
+#   data/shapefiles/br_states.shp
+#   data/shapefiles/br_biomes.shp
+#
+# Output:
+#   data/maps/ct/landcover/    landcover_<Class>_<year>.png
+#   data/maps/ct/transitions/  outflow_<Class>_<year>.png
+#                              transition_<From>_to_<To>_<year>.png
+#   data/maps/ndc/landcover/
+#   data/maps/ndc/transitions/
+#
+# Required packages:
+#   install.packages(c("terra", "dplyr", "RColorBrewer"))
+# =============================================================================
+
+library(terra)
+library(dplyr)
+library(RColorBrewer)
+
+# =============================================================================
+# 0.  Configuration
+# =============================================================================
+
+scenarios <- list(
+  ct = list(
+    rds     = "data/luc/downscaled_LUC_brazil_all_ct.rds",
+    dir_out = "data/maps/ct",
+    label   = "Current Trends"
+  ),
+  ndc = list(
+    rds     = "data/luc/downscaled_LUC_brazil_all_ndc.rds",
+    dir_out = "data/maps/ndc",
+    label   = "NDC Commitments"
+  )
+)
+
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) > 0) {
+  arg <- tolower(trimws(args[1]))
+  if (!arg %in% names(scenarios)) stop("Unknown scenario '", arg, "'. Use: ct | ndc")
+  scenarios <- scenarios[arg]
+}
+
+brazil_ext <- ext(-75, -33, -36, 6.75)
+
+scale_breaks <- c(0, 0.001, 5.9, 16.8, 37.3, 71.1, 130.4, 211.5, 260, 310)
+
+class_palettes <- list(
+  Forest    = brewer.pal(9, "Greens"),
+  Cropland  = brewer.pal(9, "Reds"),
+  Pasture   = brewer.pal(9, "Purples"),
+  OtherLand = brewer.pal(9, "RdPu"),
+  Urban     = brewer.pal(9, "Greys")
+)
+
+luc_classes <- names(class_palettes)
+
+key_transitions <- list(
+  list(from = "Forest",    to = "Cropland",  pal = brewer.pal(9, "Reds")),
+  list(from = "Forest",    to = "Pasture",   pal = brewer.pal(9, "Purples")),
+  list(from = "Cropland",  to = "Forest",    pal = brewer.pal(9, "Greens")),
+  list(from = "Pasture",   to = "Cropland",  pal = brewer.pal(9, "Reds")),
+  list(from = "OtherLand", to = "Cropland",  pal = brewer.pal(9, "Reds"))
+)
+
+# =============================================================================
+# 1.  Shared spatial objects
+# =============================================================================
+
+id_raster    <- rast("data/luc/id_raster.tif")
+brazil_states <- vect("data/shapefiles/br_states.shp")
+brazil_biomes <- vect("data/shapefiles/br_biomes.shp")
+
+cat("ID raster loaded:", nrow(id_raster), "rows x", ncol(id_raster), "cols\n")
+
+# =============================================================================
+# 2.  Helper: classify id_raster with a data frame of id_c -> value
+# =============================================================================
+
+to_raster <- function(df) {
+  reclass_mat <- as.matrix(df[, c("id_c", "value")])
+  r <- classify(id_raster, reclass_mat, others = NA)
+  terra::extend(r, brazil_ext)
+}
+
+# =============================================================================
+# 3.  Map generation (one scenario at a time)
+# =============================================================================
+
+run_scenario <- function(sc) {
+
+  cat("\n============================================================\n")
+  cat(" Scenario:", sc$label, "\n")
+  cat(" Output:  ", sc$dir_out, "\n")
+  cat("============================================================\n")
+
+  dir.create(file.path(sc$dir_out, "landcover"),   showWarnings = FALSE, recursive = TRUE)
+  dir.create(file.path(sc$dir_out, "transitions"), showWarnings = FALSE, recursive = TRUE)
+
+  luc <- readRDS(sc$rds) |>
+    rename(year = times) |>
+    mutate(
+      id_c = ifelse(grepl("_a$", ns),
+                    as.numeric(sub("_a$", "", ns)) + 1e6,
+                    as.numeric(ns)),
+      year = as.integer(year)
+    )
+
+  cat("LUC rows:", nrow(luc), "| Years:", paste(sort(unique(luc$year)), collapse = ", "), "\n")
+
+  # --- Part 1: Land Cover Maps ---
+  cat("\n--- Part 1: Land Cover ---\n")
+
+  for (cls in luc_classes) {
+    pal <- class_palettes[[cls]]
+    for (yr in sort(unique(luc$year))) {
+      df_yr <- luc |>
+        filter(lu.to == cls, year == yr) |>
+        group_by(id_c) |>
+        summarise(value = sum(value, na.rm = TRUE) * 0.1, .groups = "drop")
+
+      total_mha <- sum(df_yr$value) / 1000
+      r         <- to_raster(df_yr)
+      out_file  <- file.path(sc$dir_out, "landcover",
+                             sprintf("landcover_%s_%d.png", cls, yr))
+
+      png(out_file, width = 820, height = 780, res = 100)
+      plot(r,
+           col    = pal,
+           breaks = scale_breaks,
+           legend = "bottomright",
+           mar    = c(1.5, 0.5, 4, 0.5),
+           plg    = list(title = "1000 ha", cex = 0.8))
+      title(main = sprintf("%s\n%s | %d | Total: %.2f Mha", sc$label, cls, yr, total_mha),
+            adj = 1, cex.main = 0.9)
+      terra::plot(brazil_states, border = "lightgray", lwd = 0.1, add = TRUE)
+      terra::plot(brazil_biomes, border = "black",     lwd = 1,   add = TRUE)
+      dev.off()
+      cat("  Saved:", out_file, "\n")
+    }
+  }
+
+  # --- Part 2a: Total outflow FROM each class ---
+  cat("\n--- Part 2a: Outflows ---\n")
+
+  for (cls in luc_classes) {
+    pal <- class_palettes[[cls]]
+    for (yr in sort(unique(luc$year))) {
+      df_yr <- luc |>
+        filter(lu.from == cls, lu.to != cls, year == yr) |>
+        group_by(id_c) |>
+        summarise(value = sum(value, na.rm = TRUE) * 0.1, .groups = "drop")
+
+      total_mha <- sum(df_yr$value) / 1000
+      r         <- to_raster(df_yr)
+      out_file  <- file.path(sc$dir_out, "transitions",
+                             sprintf("outflow_%s_%d.png", cls, yr))
+
+      png(out_file, width = 820, height = 780, res = 100)
+      plot(r,
+           col    = pal,
+           breaks = scale_breaks,
+           mar    = c(1.5, 0.5, 4, 0.5),
+           plg    = list(title = "1000 ha", cex = 0.8))
+      title(main = sprintf("%s\nLoss of %s | %d | Total: %.2f Mha", sc$label, cls, yr, total_mha),
+            adj = 1, cex.main = 0.9)
+      terra::plot(brazil_states, border = "lightgray", lwd = 0.1, add = TRUE)
+      terra::plot(brazil_biomes, border = "black",     lwd = 1,   add = TRUE)
+      dev.off()
+      cat("  Saved:", out_file, "\n")
+    }
+  }
+
+  # --- Part 2b: Key transition pairs ---
+  cat("\n--- Part 2b: Key transitions ---\n")
+
+  for (tr in key_transitions) {
+    for (yr in sort(unique(luc$year))) {
+      df_yr <- luc |>
+        filter(lu.from == tr$from, lu.to == tr$to, year == yr) |>
+        group_by(id_c) |>
+        summarise(value = sum(value, na.rm = TRUE) * 0.1, .groups = "drop")
+
+      total_mha <- sum(df_yr$value) / 1000
+      r         <- to_raster(df_yr)
+      label     <- sprintf("%s_to_%s", tr$from, tr$to)
+      out_file  <- file.path(sc$dir_out, "transitions",
+                             sprintf("transition_%s_%d.png", label, yr))
+
+      png(out_file, width = 820, height = 780, res = 100)
+      plot(r,
+           col    = tr$pal,
+           breaks = scale_breaks,
+           mar    = c(1.5, 0.5, 4, 0.5),
+           plg    = list(title = "1000 ha", cex = 0.8))
+      title(main = sprintf("%s\n%s -> %s | %d | Total: %.2f Mha", sc$label, tr$from, tr$to, yr, total_mha),
+            adj = 1, cex.main = 0.9)
+      terra::plot(brazil_states, border = "lightgray", lwd = 0.1, add = TRUE)
+      terra::plot(brazil_biomes, border = "black",     lwd = 1,   add = TRUE)
+      dev.off()
+      cat("  Saved:", out_file, "\n")
+    }
+  }
+
+  cat("\nScenario", sc$label, "done.\n")
+}
+
+# =============================================================================
+# 4.  Run
+# =============================================================================
+
+for (sc in scenarios) run_scenario(sc)
+
+cat("\nAll done.\n")
