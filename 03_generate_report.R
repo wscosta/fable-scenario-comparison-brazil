@@ -683,3 +683,4 @@ for (i in seq_along(food_map)) {
 out_path <- "FABLE_Report_BRA_v50.docx"
 print(doc, target = out_path)
 message("Done. Report saved to: ", normalizePath(out_path))
+

@@ -11,3 +11,4 @@ if [ ! -f "data/maps/ct/landcover/landcover_Forest_2020.png" ]; then
     fi
 fi
 Rscript app.R
+
