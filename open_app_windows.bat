@@ -11,3 +11,4 @@ if not exist "%~dp0data\maps\ct\landcover\landcover_Forest_2020.png" (
 )
 Rscript "%~dp0app.R"
 pause
+

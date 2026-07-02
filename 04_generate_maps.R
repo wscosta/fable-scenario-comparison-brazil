@@ -9,8 +9,8 @@
 #   Rscript 04_generate_maps.R ndc      # NDC Commitments only + difference
 #
 # Input:
-#   data/luc/downscaled_LUC_brazil_all_ct.rds
-#   data/luc/downscaled_LUC_brazil_all_ndc.rds
+#   data/luc/downscaled_LUC_mapbiomas_ct.rds
+#   data/luc/downscaled_LUC_mapbiomas_ndc.rds
 #   data/luc/id_raster.tif
 #   data/shapefiles/br_states.shp
 #   data/shapefiles/br_biomes.shp
@@ -39,12 +39,12 @@ library(RColorBrewer)
 
 scenarios <- list(
   ct = list(
-    rds     = "data/luc/downscaled_LUC_brazil_all_ct.rds",
+    rds     = "data/luc/downscaled_LUC_mapbiomas_ct.rds",
     dir_out = "data/maps/ct",
     label   = "Current Trends"
   ),
   ndc = list(
-    rds     = "data/luc/downscaled_LUC_brazil_all_ndc.rds",
+    rds     = "data/luc/downscaled_LUC_mapbiomas_ndc.rds",
     dir_out = "data/maps/ndc",
     label   = "NDC Commitments"
   )
@@ -144,7 +144,7 @@ run_scenario <- function(sc) {
       df_yr <- luc |>
         filter(lu.to == cls, year == yr) |>
         group_by(id_c) |>
-        summarise(value = sum(value, na.rm = TRUE) * 0.1, .groups = "drop")
+        summarise(value = sum(value, na.rm = TRUE) * 0.001, .groups = "drop")
 
       total_mha <- sum(df_yr$value) / 1000
       r         <- to_raster(df_yr)
@@ -176,7 +176,7 @@ run_scenario <- function(sc) {
       df_yr <- luc |>
         filter(lu.from == cls, lu.to != cls, year == yr) |>
         group_by(id_c) |>
-        summarise(value = sum(value, na.rm = TRUE) * 0.1, .groups = "drop")
+        summarise(value = sum(value, na.rm = TRUE) * 0.001, .groups = "drop")
 
       total_mha <- sum(df_yr$value) / 1000
       r         <- to_raster(df_yr)
@@ -207,7 +207,7 @@ run_scenario <- function(sc) {
       df_yr <- luc |>
         filter(lu.from == tr$from, lu.to == tr$to, year == yr) |>
         group_by(id_c) |>
-        summarise(value = sum(value, na.rm = TRUE) * 0.1, .groups = "drop")
+        summarise(value = sum(value, na.rm = TRUE) * 0.001, .groups = "drop")
 
       total_mha <- sum(df_yr$value) / 1000
       r         <- to_raster(df_yr)
@@ -260,8 +260,8 @@ run_diff <- function() {
   dir.create(file.path(dir_diff, "landcover"),   showWarnings = FALSE, recursive = TRUE)
   dir.create(file.path(dir_diff, "transitions"), showWarnings = FALSE, recursive = TRUE)
 
-  luc_ct  <- load_luc("data/luc/downscaled_LUC_brazil_all_ct.rds")
-  luc_ndc <- load_luc("data/luc/downscaled_LUC_brazil_all_ndc.rds")
+  luc_ct  <- load_luc("data/luc/downscaled_LUC_mapbiomas_ct.rds")
+  luc_ndc <- load_luc("data/luc/downscaled_LUC_mapbiomas_ndc.rds")
 
   years <- sort(unique(luc_ct$year))
 
@@ -293,9 +293,9 @@ run_diff <- function() {
   for (cls in luc_classes) {
     for (yr in years) {
       df_ct  <- luc_ct  |> filter(lu.to == cls, year == yr) |>
-                group_by(id_c) |> summarise(value = sum(value) * 0.1, .groups = "drop")
+                group_by(id_c) |> summarise(value = sum(value) * 0.001, .groups = "drop")
       df_ndc <- luc_ndc |> filter(lu.to == cls, year == yr) |>
-                group_by(id_c) |> summarise(value = sum(value) * 0.1, .groups = "drop")
+                group_by(id_c) |> summarise(value = sum(value) * 0.001, .groups = "drop")
 
       r_diff    <- to_raster(df_ndc) - to_raster(df_ct)
       delta_mha <- (sum(df_ndc$value) - sum(df_ct$value)) / 1000
@@ -312,9 +312,9 @@ run_diff <- function() {
   for (cls in luc_classes) {
     for (yr in years) {
       df_ct  <- luc_ct  |> filter(lu.from == cls, lu.to != cls, year == yr) |>
-                group_by(id_c) |> summarise(value = sum(value) * 0.1, .groups = "drop")
+                group_by(id_c) |> summarise(value = sum(value) * 0.001, .groups = "drop")
       df_ndc <- luc_ndc |> filter(lu.from == cls, lu.to != cls, year == yr) |>
-                group_by(id_c) |> summarise(value = sum(value) * 0.1, .groups = "drop")
+                group_by(id_c) |> summarise(value = sum(value) * 0.001, .groups = "drop")
 
       r_diff    <- to_raster(df_ndc) - to_raster(df_ct)
       delta_mha <- (sum(df_ndc$value) - sum(df_ct$value)) / 1000
@@ -332,9 +332,9 @@ run_diff <- function() {
     label <- sprintf("%s_to_%s", tr$from, tr$to)
     for (yr in years) {
       df_ct  <- luc_ct  |> filter(lu.from == tr$from, lu.to == tr$to, year == yr) |>
-                group_by(id_c) |> summarise(value = sum(value) * 0.1, .groups = "drop")
+                group_by(id_c) |> summarise(value = sum(value) * 0.001, .groups = "drop")
       df_ndc <- luc_ndc |> filter(lu.from == tr$from, lu.to == tr$to, year == yr) |>
-                group_by(id_c) |> summarise(value = sum(value) * 0.1, .groups = "drop")
+                group_by(id_c) |> summarise(value = sum(value) * 0.001, .groups = "drop")
 
       r_diff    <- to_raster(df_ndc) - to_raster(df_ct)
       delta_mha <- (sum(df_ndc$value) - sum(df_ct$value)) / 1000
@@ -356,3 +356,4 @@ if (!diff_only) for (sc in scenarios) run_scenario(sc)
 run_diff()
 
 cat("\nAll done.\n")
+

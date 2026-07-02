@@ -8,3 +8,4 @@ options(shiny.launch.browser = TRUE)
 # print.eval = TRUE forces the shinyApp() object to be printed,
 # which triggers runApp() even in non-interactive Rscript sessions
 source("02_shiny_app.R", print.eval = TRUE)
+

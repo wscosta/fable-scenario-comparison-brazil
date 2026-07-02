@@ -115,3 +115,4 @@ saveRDS(fable_units,   "data/processed/fable_units.rds")
 saveRDS(df_crops,      "data/processed/df_crops.rds")
 saveRDS(df_livestock,  "data/processed/df_livestock.rds")
 message("Saved: df_scenarios.rds, df_hist.rds, fable_units.rds, df_crops.rds, df_livestock.rds")
+
