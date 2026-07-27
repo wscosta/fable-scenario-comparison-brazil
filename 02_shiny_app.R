@@ -3,19 +3,101 @@ suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(plotly))
 suppressPackageStartupMessages(library(bslib))
 
-# Run 01_process_data.R first if any processed file is missing
-if (!file.exists("data/processed/df_scenarios.rds") ||
-    !file.exists("data/processed/fable_units.rds")  ||
-    !file.exists("data/processed/df_crops.rds")     ||
-    !file.exists("data/processed/df_livestock.rds")) {
-  source("01_process_data.R")
+# Run 01_process_data.R if any processed file is missing, or if the scenario
+# set on disk (data/xlsx/scenarios.csv) no longer matches what's cached.
+needs_reprocess <- function() {
+  if (!file.exists("data/processed/df_scenarios.rds") ||
+      !file.exists("data/processed/fable_units.rds")  ||
+      !file.exists("data/processed/df_crops.rds")     ||
+      !file.exists("data/processed/df_livestock.rds")) return(TRUE)
+  cached  <- sort(unique(readRDS("data/processed/df_scenarios.rds")$scenario))
+  current <- sort(read.csv("data/xlsx/scenarios.csv", stringsAsFactors = FALSE)$label)
+  !identical(cached, current)
 }
+if (needs_reprocess()) source("01_process_data.R")
 
 df_scenarios <- readRDS("data/processed/df_scenarios.rds")
 df_hist      <- readRDS("data/processed/df_hist.rds")
 fable_units  <- readRDS("data/processed/fable_units.rds")
 df_crops     <- readRDS("data/processed/df_crops.rds")
 df_livestock <- readRDS("data/processed/df_livestock.rds")
+
+# ── Scenario discovery, order, and colors ─────────────────────────────────────
+# data/xlsx/scenarios.csv is the single source of truth for which scenarios
+# exist and what order they display in (switches, legend, table rows, palette
+# assignment) — adding a scenario is just a new xlsx + a new CSV row.
+scenario_meta       <- read.csv("data/xlsx/scenarios.csv", stringsAsFactors = FALSE)
+available_scenarios <- scenario_meta$label
+
+SCENARIO_PALETTE <- c("#1565C0", "#009C3B", "#E65100", "#6A1B9A",
+                      "#00838F", "#C62828", "#4527A0", "#AD1457")
+scenario_colors <- setNames(
+  SCENARIO_PALETTE[((seq_along(available_scenarios) - 1) %% length(SCENARIO_PALETTE)) + 1],
+  available_scenarios
+)
+
+# Only the most recent UP calibration starts with its switches on — otherwise
+# every new UP added to scenarios.csv piles onto an already-crowded default
+# view. Driven by the optional `up` column (numeric calibration number); rows
+# whose `up` equals the max `up` across the whole file default to checked.
+# Falls back to "everything on" if `up` is absent/all-NA, so scenarios.csv
+# without that column keeps working exactly as before.
+default_scenarios <- if ("up" %in% names(scenario_meta) && any(!is.na(scenario_meta$up))) {
+  scenario_meta$label[scenario_meta$up == max(scenario_meta$up, na.rm = TRUE)]
+} else {
+  available_scenarios
+}
+
+# One switch per scenario instead of a fixed-choice checkboxGroupInput — any
+# number of scenarios can be selected at once, same pattern as the sister
+# MAgPIE app's scenario_switches_ui()/get_selected_scenarios_r().
+scenario_switches_ui <- function(prefix, scenarios = available_scenarios, default_on = default_scenarios) {
+  div(class = "scen-group",
+      tags$label("Scenario", class = "control-label"),
+      lapply(scenarios, function(s)
+        input_switch(paste0(prefix, "_scen_", make.names(s)), s, value = s %in% default_on)))
+}
+
+get_selected_scenarios_r <- function(input, prefix, scenarios = available_scenarios) {
+  scenarios[sapply(scenarios, function(s)
+    isTRUE(input[[paste0(prefix, "_scen_", make.names(s))]]))]
+}
+
+# Icon-only "Chart type" picker (mirrors the sister MAgPIE app's UI) — a
+# single button showing the currently-selected chart type's icon; clicking it
+# opens a small dropdown menu (Line/Bar/Area, each icon + label) and picking
+# one collapses back to just that icon. Everything downstream still reads
+# input[[input_id]] and compares it against the literal strings "Line
+# chart"/"Bar chart"/"Area chart" — this keeps those exact values/id by using
+# a REAL (but visually hidden) radioButtons() under the hood; the dropdown is
+# a pure CSS/JS skin driven by the shiny:connected handler in the page header,
+# clicking a dropdown item just checks the matching hidden native radio and
+# fires its `change` event, so nothing downstream needed to change.
+CHART_TYPE_CHOICES <- c("Line chart", "Bar chart", "Area chart")
+CHART_TYPE_ICONS   <- c("Line chart" = "chart-line", "Bar chart" = "chart-column", "Area chart" = "chart-area")
+
+chart_type_ui <- function(input_id, default = "Line chart", label = "Chart type") {
+  div(class = "chart-type-dropdown dropdown", `data-chart-id` = input_id,
+      tags$button(
+        class = "btn btn-outline-secondary btn-sm dropdown-toggle chart-type-toggle",
+        type = "button", `data-bs-toggle` = "dropdown", `aria-expanded` = "false",
+        title = label,
+        tags$i(class = paste0("fas fa-", CHART_TYPE_ICONS[[default]]))
+      ),
+      tags$ul(class = "dropdown-menu",
+        lapply(CHART_TYPE_CHOICES, function(choice) {
+          tags$li(tags$a(
+            href = "#",
+            class = paste("dropdown-item chart-type-item", if (choice == default) "active"),
+            `data-value` = choice, `data-icon` = CHART_TYPE_ICONS[[choice]],
+            tags$i(class = paste0("fas fa-", CHART_TYPE_ICONS[[choice]])), " ", choice
+          ))
+        })
+      ),
+      div(class = "chart-type-hidden-radio",
+          radioButtons(input_id, label, choices = CHART_TYPE_CHOICES, selected = default))
+  )
+}
 
 # ── Unit conversion ───────────────────────────────────────────────────────────
 to_mha <- function(values, col_name, unit_override = NULL) {
@@ -64,15 +146,34 @@ get_hist <- function(class_name, x_max) {
 }
 
 # ── Colors ────────────────────────────────────────────────────────────────────
+# Per-scenario colors come from scenario_colors (assigned above from
+# SCENARIO_PALETTE by scenario order) instead of fixed CT/NDC constants.
 COL_HIST <- "#000000"
-COL_CT   <- "#1565C0"
-COL_NDC  <- "#009C3B"
 
 hex_to_rgba <- function(hex, alpha = 0.25) {
   r <- strtoi(substr(hex, 2, 3), 16L)
   g <- strtoi(substr(hex, 4, 5), 16L)
   b <- strtoi(substr(hex, 6, 7), 16L)
   sprintf("rgba(%d,%d,%d,%.2f)", r, g, b, alpha)
+}
+
+# Shared scenario-trace builder — used by every chart in every tab so
+# "Area chart" styling (black outline, colour fill at 25% alpha) etc. stays
+# consistent instead of being reimplemented per tab.
+add_scenario_trace <- function(p, dat, name, col, chart_type, hover) {
+  if (chart_type == "Bar chart") {
+    add_trace(p, data = dat, x = ~year, y = ~value, type = "bar", name = name,
+              marker = list(color = col, line = list(color = "black", width = 1)),
+              hovertemplate = hover)
+  } else if (chart_type == "Area chart") {
+    add_trace(p, data = dat, x = ~year, y = ~value, type = "scatter", mode = "lines",
+              fill = "tozeroy", fillcolor = hex_to_rgba(col, 0.25), name = name,
+              line = list(color = "black", width = 1.5), hovertemplate = hover)
+  } else {
+    add_trace(p, data = dat, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
+              name = name, line = list(color = col, width = 2),
+              marker = list(color = col, size = 7), hovertemplate = hover)
+  }
 }
 
 # ── Shared layout helper ──────────────────────────────────────────────────────
@@ -179,117 +280,25 @@ add_hist_trace <- function(p, hist_data, source_label, chart_type = "Line chart"
   }
 }
 
-make_combined_plot <- function(class_name, x_max, y_range, chart_type = "Line chart") {
-  col  <- landuse_map[[class_name]]$fable_col
+make_plot <- function(class_name, scenario_sel, x_max, y_range, chart_type = "Line chart") {
+  cfg <- landuse_map[[class_name]]
+  p   <- plot_ly()
 
-  ct <- df_scenarios %>%
-    filter(scenario == "Current Trends", Year <= x_max) %>%
-    select(year = Year, value = all_of(col)) %>%
-    mutate(value = to_mha(as.numeric(value), col, landuse_map[[class_name]]$fable_unit))
-
-  ndc <- df_scenarios %>%
-    filter(scenario == "NDC Commitments", Year <= x_max) %>%
-    select(year = Year, value = all_of(col)) %>%
-    mutate(value = to_mha(as.numeric(value), col, landuse_map[[class_name]]$fable_unit))
-
-  hist_data    <- get_hist(class_name, x_max)
-  source_label <- landuse_map[[class_name]]$hist_source
-
-  if (chart_type == "Bar chart") {
-    p <- plot_ly() %>%
-      add_trace(data = ct, x = ~year, y = ~value,
-                type = "bar", name = "Current Trends",
-                marker = list(color = COL_CT,
-                              line  = list(color = "black", width = 1)),
-                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>Current Trends</extra>") %>%
-      add_trace(data = ndc, x = ~year, y = ~value,
-                type = "bar", name = "NDC Commitments",
-                marker = list(color = COL_NDC,
-                              line  = list(color = "black", width = 1)),
-                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>NDC Commitments</extra>") %>%
-      add_hist_trace(hist_data, source_label, chart_type)
-  } else if (chart_type == "Area chart") {
-    p <- plot_ly() %>%
-      add_trace(data = ct, x = ~year, y = ~value,
-                type = "scatter", mode = "lines", fill = "tozeroy",
-                fillcolor = hex_to_rgba(COL_CT, 0.25),
-                name = "Current Trends",
-                line = list(color = "black", width = 1.5),
-                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>Current Trends</extra>") %>%
-      add_trace(data = ndc, x = ~year, y = ~value,
-                type = "scatter", mode = "lines", fill = "tozeroy",
-                fillcolor = hex_to_rgba(COL_NDC, 0.25),
-                name = "NDC Commitments",
-                line = list(color = "black", width = 1.5),
-                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>NDC Commitments</extra>") %>%
-      add_hist_trace(hist_data, source_label, chart_type)
-  } else {
-    p <- plot_ly() %>%
-      add_trace(data = ct, x = ~year, y = ~value,
-                type = "scatter", mode = "lines+markers",
-                name = "Current Trends",
-                line   = list(color = COL_CT, width = 2),
-                marker = list(color = COL_CT, size = 7),
-                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>Current Trends</extra>") %>%
-      add_trace(data = ndc, x = ~year, y = ~value,
-                type = "scatter", mode = "lines+markers",
-                name = "NDC Commitments",
-                line   = list(color = COL_NDC, width = 2),
-                marker = list(color = COL_NDC, size = 7),
-                hovertemplate = "%{x}: <b>%{y:.2f} Mha</b><extra>NDC Commitments</extra>") %>%
-      add_hist_trace(hist_data, source_label, chart_type)
+  for (s in scenario_sel) {
+    dat <- df_scenarios %>%
+      filter(scenario == s, Year <= x_max) %>%
+      select(year = Year, value = all_of(cfg$fable_col)) %>%
+      mutate(value = to_mha(as.numeric(value), cfg$fable_col, cfg$fable_unit))
+    hover <- paste0("%{x}: <b>%{y:.2f} Mha</b><extra>", s, "</extra>")
+    p <- add_scenario_trace(p, dat, s, scenario_colors[[s]], chart_type, hover)
   }
 
-  base_layout(p, paste0(class_name, ": Current Trends vs NDC Commitments"),
+  hist_data <- get_hist(class_name, x_max)
+  p <- add_hist_trace(p, hist_data, cfg$hist_source, chart_type)
+
+  base_layout(p, class_name,
               x_max = x_max, y_range = y_range,
-              y_label = landuse_map[[class_name]]$y_label,
-              barmode = if (chart_type == "Bar chart") "group" else NULL)
-}
-
-make_single_plot <- function(class_name, scenario_name, bar_color, x_max, y_range,
-                             chart_type = "Line chart") {
-  col  <- landuse_map[[class_name]]$fable_col
-
-  scen <- df_scenarios %>%
-    filter(scenario == scenario_name, Year <= x_max) %>%
-    select(year = Year, value = all_of(col)) %>%
-    mutate(value = to_mha(as.numeric(value), col, landuse_map[[class_name]]$fable_unit))
-
-  hist_data    <- get_hist(class_name, x_max)
-  source_label <- landuse_map[[class_name]]$hist_source
-  hover        <- paste0("%{x}: <b>%{y:.2f} Mha</b><extra>", scenario_name, "</extra>")
-
-  if (chart_type == "Bar chart") {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value,
-                type = "bar", name = scenario_name,
-                marker = list(color = bar_color,
-                              line  = list(color = "black", width = 1)),
-                hovertemplate = hover) %>%
-      add_hist_trace(hist_data, source_label, chart_type)
-  } else if (chart_type == "Area chart") {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value,
-                type = "scatter", mode = "lines", fill = "tozeroy",
-                fillcolor = hex_to_rgba(bar_color, 0.25),
-                name = scenario_name,
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover) %>%
-      add_hist_trace(hist_data, source_label, chart_type)
-  } else {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value,
-                type = "scatter", mode = "lines+markers",
-                name = scenario_name,
-                line   = list(color = bar_color, width = 2),
-                marker = list(color = bar_color, size = 7),
-                hovertemplate = hover) %>%
-      add_hist_trace(hist_data, source_label, chart_type)
-  }
-
-  base_layout(p, paste0(class_name, ": ", scenario_name),
-              bar_color, x_max = x_max, y_range = y_range,
-              y_label = landuse_map[[class_name]]$y_label,
+              y_label = cfg$y_label,
               barmode = if (chart_type == "Bar chart") "group" else NULL)
 }
 
@@ -309,11 +318,7 @@ make_table_data <- function(class_name, scenario_sel, x_max) {
     to_mha(raw, col, cfg$fable_unit)
   }
 
-  if ("Current Trends" %in% scenario_sel)
-    rows[["Current Trends"]] <- pull_scenario("Current Trends")
-
-  if ("NDC Commitments" %in% scenario_sel)
-    rows[["NDC Commitments"]] <- pull_scenario("NDC Commitments")
+  for (s in scenario_sel) rows[[s]] <- pull_scenario(s)
 
   hist_data <- get_hist(class_name, 2020)
   rows[["Historical"]] <- sapply(years, function(y) {
@@ -350,15 +355,10 @@ make_diff_data <- function(class_name, scenario_sel, type = "absolute") {
   }
 
   rows <- list()
-  if ("Current Trends" %in% scenario_sel) {
-    v <- pull_scenario("Current Trends")
-    rows[["Current Trends"]] <- if (type == "absolute") abs(v - hist_vals)
-                                else (v - hist_vals) / hist_vals * 100
-  }
-  if ("NDC Commitments" %in% scenario_sel) {
-    v <- pull_scenario("NDC Commitments")
-    rows[["NDC Commitments"]] <- if (type == "absolute") abs(v - hist_vals)
-                                 else (v - hist_vals) / hist_vals * 100
+  for (s in scenario_sel) {
+    v <- pull_scenario(s)
+    rows[[s]] <- if (type == "absolute") abs(v - hist_vals)
+                 else (v - hist_vals) / hist_vals * 100
   }
 
   mat <- do.call(rbind, rows)
@@ -469,10 +469,8 @@ get_crop_fable <- function(crop_name, type_sel, scenario_name, x_max) {
 }
 
 calc_crop_y_range <- function(crop_name, type_sel, x_max, zero_base = TRUE) {
-  scen_vals <- bind_rows(
-    get_crop_fable(crop_name, type_sel, "Current Trends",  x_max),
-    get_crop_fable(crop_name, type_sel, "NDC Commitments", x_max)
-  )$value
+  scen_vals <- bind_rows(lapply(available_scenarios, get_crop_fable,
+                                crop_name = crop_name, type_sel = type_sel, x_max = x_max))$value
   hist_vals <- get_crop_hist_data(crop_name, type_sel, x_max)$value
   all_vals  <- c(scen_vals, hist_vals)
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
@@ -482,83 +480,21 @@ calc_crop_y_range <- function(crop_name, type_sel, x_max, zero_base = TRUE) {
 }
 
 # ── Crop plot builders ────────────────────────────────────────────────────────
-make_crop_combined_plot <- function(crop_name, type_sel, x_max, y_range, chart_type) {
+make_crop_plot <- function(crop_name, type_sel, scenario_sel, x_max, y_range, chart_type) {
   y_label    <- crop_y_label[[type_sel]]
   unit_label <- crop_hover_unit[[type_sel]]
-  hover      <- function(nm) paste0("%{x}: <b>%{y:.2f} ", unit_label, "</b><extra>", nm, "</extra>")
+  p          <- plot_ly()
 
-  ct        <- get_crop_fable(crop_name, type_sel, "Current Trends",  x_max)
-  ndc       <- get_crop_fable(crop_name, type_sel, "NDC Commitments", x_max)
-  hist_data <- get_crop_hist_data(crop_name, type_sel, x_max)
-
-  if (chart_type == "Bar chart") {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "bar", name = "Current Trends",
-                marker = list(color = COL_CT,  line = list(color = "black", width = 1)),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
-                marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
-                hovertemplate = hover("NDC Commitments"))
-  } else if (chart_type == "Area chart") {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
-                name = "Current Trends",
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
-                name = "NDC Commitments",
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover("NDC Commitments"))
-  } else {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = "Current Trends",
-                line = list(color = COL_CT, width = 2), marker = list(color = COL_CT, size = 7),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = "NDC Commitments",
-                line = list(color = COL_NDC, width = 2), marker = list(color = COL_NDC, size = 7),
-                hovertemplate = hover("NDC Commitments"))
+  for (s in scenario_sel) {
+    dat   <- get_crop_fable(crop_name, type_sel, s, x_max)
+    hover <- paste0("%{x}: <b>%{y:.2f} ", unit_label, "</b><extra>", s, "</extra>")
+    p <- add_scenario_trace(p, dat, s, scenario_colors[[s]], chart_type, hover)
   }
-  p <- p %>% add_hist_trace(hist_data, "IBGE", chart_type, unit_label)
-  base_layout(p, paste0(crop_name, ": Current Trends vs NDC Commitments"),
+
+  hist_data <- get_crop_hist_data(crop_name, type_sel, x_max)
+  p <- add_hist_trace(p, hist_data, "IBGE", chart_type, unit_label)
+  base_layout(p, crop_name,
               x_max = x_max, y_range = y_range, y_label = y_label,
-              barmode = if (chart_type == "Bar chart") "group" else NULL)
-}
-
-make_crop_single_plot <- function(crop_name, type_sel, scenario_name, bar_color,
-                                  x_max, y_range, chart_type) {
-  y_label    <- crop_y_label[[type_sel]]
-  unit_label <- crop_hover_unit[[type_sel]]
-  hover_tmpl <- paste0("%{x}: <b>%{y:.2f} ", unit_label, "</b><extra>", scenario_name, "</extra>")
-
-  scen      <- get_crop_fable(crop_name, type_sel, scenario_name, x_max)
-  hist_data <- get_crop_hist_data(crop_name, type_sel, x_max)
-
-  if (chart_type == "Bar chart") {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
-                marker = list(color = bar_color, line = list(color = "black", width = 1)),
-                hovertemplate = hover_tmpl)
-  } else if (chart_type == "Area chart") {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
-                name = scenario_name,
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover_tmpl)
-  } else {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = scenario_name,
-                line = list(color = bar_color, width = 2), marker = list(color = bar_color, size = 7),
-                hovertemplate = hover_tmpl)
-  }
-  p <- p %>% add_hist_trace(hist_data, "IBGE", chart_type, unit_label)
-  base_layout(p, paste0(crop_name, ": ", scenario_name),
-              bar_color, x_max = x_max, y_range = y_range, y_label = y_label,
               barmode = if (chart_type == "Bar chart") "group" else NULL)
 }
 
@@ -571,10 +507,7 @@ make_crop_table_data <- function(crop_name, type_sel, scenario_sel, x_max) {
     get_crop_fable(crop_name, type_sel, scen_name, x_max) %>%
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
-  if ("Current Trends" %in% scenario_sel)
-    rows[["Current Trends"]] <- pull_fable("Current Trends")
-  if ("NDC Commitments" %in% scenario_sel)
-    rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
+  for (s in scenario_sel) rows[[s]] <- pull_fable(s)
 
   hist_all <- get_crop_hist_data(crop_name, type_sel, 2020)
   rows[["Historical"]] <- sapply(years, function(y) {
@@ -603,15 +536,10 @@ make_crop_diff_data <- function(crop_name, type_sel, scenario_sel, type = "absol
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
   rows <- list()
-  if ("Current Trends" %in% scenario_sel) {
-    v <- pull_fable("Current Trends")
-    rows[["Current Trends"]] <- if (type == "absolute") abs(v - hist_vals)
-                                else (v - hist_vals) / hist_vals * 100
-  }
-  if ("NDC Commitments" %in% scenario_sel) {
-    v <- pull_fable("NDC Commitments")
-    rows[["NDC Commitments"]] <- if (type == "absolute") abs(v - hist_vals)
-                                 else (v - hist_vals) / hist_vals * 100
+  for (s in scenario_sel) {
+    v <- pull_fable(s)
+    rows[[s]] <- if (type == "absolute") abs(v - hist_vals)
+                 else (v - hist_vals) / hist_vals * 100
   }
 
   mat <- do.call(rbind, rows)
@@ -684,10 +612,8 @@ get_live_hist <- function(product, x_max) {
 }
 
 calc_live_y_range <- function(product, x_max, zero_base = TRUE) {
-  scen_vals <- bind_rows(
-    get_live_fable(product, "Current Trends",  x_max),
-    get_live_fable(product, "NDC Commitments", x_max)
-  )$value
+  scen_vals <- bind_rows(lapply(available_scenarios, get_live_fable,
+                                product = product, x_max = x_max))$value
   hist_vals <- get_live_hist(product, x_max)$value
   all_vals  <- c(scen_vals, hist_vals)
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
@@ -697,84 +623,23 @@ calc_live_y_range <- function(product, x_max, zero_base = TRUE) {
 }
 
 # ── Livestock plot builders ───────────────────────────────────────────────────
-make_live_combined_plot <- function(product, x_max, y_range, chart_type) {
-  cfg       <- livestock_map[[product]]
-  unit_lbl  <- cfg$unit_label
-  y_lbl     <- cfg$y_label
-  hover     <- function(nm) paste0("%{x}: <b>%{y:.2f} ", unit_lbl, "</b><extra>", nm, "</extra>")
-  ct        <- get_live_fable(product, "Current Trends",  x_max)
-  ndc       <- get_live_fable(product, "NDC Commitments", x_max)
+make_live_plot <- function(product, scenario_sel, x_max, y_range, chart_type) {
+  cfg      <- livestock_map[[product]]
+  unit_lbl <- cfg$unit_label
+  y_lbl    <- cfg$y_label
+  p        <- plot_ly()
+
+  for (s in scenario_sel) {
+    dat   <- get_live_fable(product, s, x_max)
+    hover <- paste0("%{x}: <b>%{y:.2f} ", unit_lbl, "</b><extra>", s, "</extra>")
+    p <- add_scenario_trace(p, dat, s, scenario_colors[[s]], chart_type, hover)
+  }
+
   hist_data <- get_live_hist(product, x_max)
   src_label <- if (cfg$has_hist) cfg$hist_source else ""
-
-  if (chart_type == "Bar chart") {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "bar", name = "Current Trends",
-                marker = list(color = COL_CT,  line = list(color = "black", width = 1)),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
-                marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
-                hovertemplate = hover("NDC Commitments"))
-  } else if (chart_type == "Area chart") {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
-                name = "Current Trends",
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
-                name = "NDC Commitments",
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover("NDC Commitments"))
-  } else {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = "Current Trends",
-                line = list(color = COL_CT,  width = 2), marker = list(color = COL_CT,  size = 7),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = "NDC Commitments",
-                line = list(color = COL_NDC, width = 2), marker = list(color = COL_NDC, size = 7),
-                hovertemplate = hover("NDC Commitments"))
-  }
-  p <- p %>% add_hist_trace(hist_data, src_label, chart_type, unit_lbl)
-  base_layout(p, paste0(product, ": Current Trends vs NDC Commitments"),
+  p <- add_hist_trace(p, hist_data, src_label, chart_type, unit_lbl)
+  base_layout(p, product,
               x_max = x_max, y_range = y_range, y_label = y_lbl,
-              barmode = if (chart_type == "Bar chart") "group" else NULL)
-}
-
-make_live_single_plot <- function(product, scenario_name, bar_color, x_max, y_range, chart_type) {
-  cfg        <- livestock_map[[product]]
-  unit_lbl   <- cfg$unit_label
-  y_lbl      <- cfg$y_label
-  hover_tmpl <- paste0("%{x}: <b>%{y:.2f} ", unit_lbl, "</b><extra>", scenario_name, "</extra>")
-  scen      <- get_live_fable(product, scenario_name, x_max)
-  hist_data <- get_live_hist(product, x_max)
-  src_label <- if (cfg$has_hist) cfg$hist_source else ""
-
-  if (chart_type == "Bar chart") {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
-                marker = list(color = bar_color, line = list(color = "black", width = 1)),
-                hovertemplate = hover_tmpl)
-  } else if (chart_type == "Area chart") {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
-                name = scenario_name,
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover_tmpl)
-  } else {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = scenario_name,
-                line = list(color = bar_color, width = 2), marker = list(color = bar_color, size = 7),
-                hovertemplate = hover_tmpl)
-  }
-  p <- p %>% add_hist_trace(hist_data, src_label, chart_type, unit_lbl)
-  base_layout(p, paste0(product, ": ", scenario_name),
-              bar_color, x_max = x_max, y_range = y_range, y_label = y_lbl,
               barmode = if (chart_type == "Bar chart") "group" else NULL)
 }
 
@@ -787,10 +652,7 @@ make_live_table_data <- function(product, scenario_sel, x_max) {
     get_live_fable(product, scen_name, x_max) %>%
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
-  if ("Current Trends" %in% scenario_sel)
-    rows[["Current Trends"]] <- pull_fable("Current Trends")
-  if ("NDC Commitments" %in% scenario_sel)
-    rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
+  for (s in scenario_sel) rows[[s]] <- pull_fable(s)
 
   if (livestock_map[[product]]$has_hist) {
     hist_all <- get_live_hist(product, 2020)
@@ -822,15 +684,10 @@ make_live_diff_data <- function(product, scenario_sel, type = "absolute") {
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
   rows <- list()
-  if ("Current Trends" %in% scenario_sel) {
-    v <- pull_fable("Current Trends")
-    rows[["Current Trends"]] <- if (type == "absolute") abs(v - hist_vals)
-                                else (v - hist_vals) / hist_vals * 100
-  }
-  if ("NDC Commitments" %in% scenario_sel) {
-    v <- pull_fable("NDC Commitments")
-    rows[["NDC Commitments"]] <- if (type == "absolute") abs(v - hist_vals)
-                                 else (v - hist_vals) / hist_vals * 100
+  for (s in scenario_sel) {
+    v <- pull_fable(s)
+    rows[[s]] <- if (type == "absolute") abs(v - hist_vals)
+                 else (v - hist_vals) / hist_vals * 100
   }
 
   mat <- do.call(rbind, rows)
@@ -889,10 +746,8 @@ get_trade_fable <- function(trade_type, product, scenario_name, x_max) {
 }
 
 calc_trade_y_range <- function(trade_type, product, x_max, zero_base = TRUE) {
-  all_vals <- bind_rows(
-    get_trade_fable(trade_type, product, "Current Trends",  x_max),
-    get_trade_fable(trade_type, product, "NDC Commitments", x_max)
-  )$value
+  all_vals <- bind_rows(lapply(available_scenarios, get_trade_fable,
+                               trade_type = trade_type, product = product, x_max = x_max))$value
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
   y_min <- if (zero_base && min(all_vals, na.rm = TRUE) >= 0) 0
             else min(all_vals, na.rm = TRUE) - pad
@@ -900,74 +755,17 @@ calc_trade_y_range <- function(trade_type, product, x_max, zero_base = TRUE) {
 }
 
 # ── Trade plot builders ───────────────────────────────────────────────────────
-make_trade_combined_plot <- function(trade_type, product, x_max, y_range, chart_type) {
-  hover <- function(nm) paste0("%{x}: <b>%{y:.2f} Mt</b><extra>", nm, "</extra>")
-  ct    <- get_trade_fable(trade_type, product, "Current Trends",  x_max)
-  ndc   <- get_trade_fable(trade_type, product, "NDC Commitments", x_max)
+make_trade_plot <- function(trade_type, product, scenario_sel, x_max, y_range, chart_type) {
+  p <- plot_ly()
 
-  if (chart_type == "Bar chart") {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "bar", name = "Current Trends",
-                marker = list(color = COL_CT,  line = list(color = "black", width = 1)),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
-                marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
-                hovertemplate = hover("NDC Commitments"))
-  } else if (chart_type == "Area chart") {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
-                name = "Current Trends",
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
-                name = "NDC Commitments",
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover("NDC Commitments"))
-  } else {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = "Current Trends",
-                line = list(color = COL_CT,  width = 2), marker = list(color = COL_CT,  size = 7),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = "NDC Commitments",
-                line = list(color = COL_NDC, width = 2), marker = list(color = COL_NDC, size = 7),
-                hovertemplate = hover("NDC Commitments"))
+  for (s in scenario_sel) {
+    dat   <- get_trade_fable(trade_type, product, s, x_max)
+    hover <- paste0("%{x}: <b>%{y:.2f} Mt</b><extra>", s, "</extra>")
+    p <- add_scenario_trace(p, dat, s, scenario_colors[[s]], chart_type, hover)
   }
-  base_layout(p, paste0(product, " ", trade_type, ": Current Trends vs NDC Commitments"),
+
+  base_layout(p, paste0(product, " ", trade_type),
               x_max = x_max, y_range = y_range, y_label = paste0(trade_type, " (Mt)"),
-              barmode = if (chart_type == "Bar chart") "group" else NULL)
-}
-
-make_trade_single_plot <- function(trade_type, product, scenario_name, bar_color,
-                                   x_max, y_range, chart_type) {
-  hover_tmpl <- paste0("%{x}: <b>%{y:.2f} Mt</b><extra>", scenario_name, "</extra>")
-  scen <- get_trade_fable(trade_type, product, scenario_name, x_max)
-
-  if (chart_type == "Bar chart") {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
-                marker = list(color = bar_color, line = list(color = "black", width = 1)),
-                hovertemplate = hover_tmpl)
-  } else if (chart_type == "Area chart") {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
-                name = scenario_name,
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover_tmpl)
-  } else {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = scenario_name,
-                line = list(color = bar_color, width = 2), marker = list(color = bar_color, size = 7),
-                hovertemplate = hover_tmpl)
-  }
-  base_layout(p, paste0(product, " ", trade_type, ": ", scenario_name),
-              bar_color, x_max = x_max, y_range = y_range,
-              y_label = paste0(trade_type, " (Mt)"),
               barmode = if (chart_type == "Bar chart") "group" else NULL)
 }
 
@@ -980,10 +778,7 @@ make_trade_table_data <- function(trade_type, product, scenario_sel, x_max) {
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
   rows <- list()
-  if ("Current Trends" %in% scenario_sel)
-    rows[["Current Trends"]] <- pull_fable("Current Trends")
-  if ("NDC Commitments" %in% scenario_sel)
-    rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
+  for (s in scenario_sel) rows[[s]] <- pull_fable(s)
 
   mat <- do.call(rbind, rows)
   df  <- as.data.frame(mat)
@@ -1010,10 +805,8 @@ get_food_fable <- function(variable, scenario_name, x_max) {
 }
 
 calc_food_y_range <- function(variable, x_max, zero_base = TRUE) {
-  all_vals <- bind_rows(
-    get_food_fable(variable, "Current Trends",  x_max),
-    get_food_fable(variable, "NDC Commitments", x_max)
-  )$value
+  all_vals <- bind_rows(lapply(available_scenarios, get_food_fable,
+                               variable = variable, x_max = x_max))$value
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
   y_min <- if (zero_base && min(all_vals, na.rm = TRUE) >= 0) 0
             else min(all_vals, na.rm = TRUE) - pad
@@ -1021,74 +814,18 @@ calc_food_y_range <- function(variable, x_max, zero_base = TRUE) {
 }
 
 # ── Food plot builders ────────────────────────────────────────────────────────
-make_food_combined_plot <- function(variable, x_max, y_range, chart_type) {
-  cfg   <- food_map[[variable]]
-  hover <- function(nm) paste0("%{x}: <b>%{y:.0f} Intake (kcal/cap/day)</b><extra>", nm, "</extra>")
-  ct    <- get_food_fable(variable, "Current Trends",  x_max)
-  ndc   <- get_food_fable(variable, "NDC Commitments", x_max)
+make_food_plot <- function(variable, scenario_sel, x_max, y_range, chart_type) {
+  cfg <- food_map[[variable]]
+  p   <- plot_ly()
 
-  if (chart_type == "Bar chart") {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "bar", name = "Current Trends",
-                marker = list(color = COL_CT,  line = list(color = "black", width = 1)),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
-                marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
-                hovertemplate = hover("NDC Commitments"))
-  } else if (chart_type == "Area chart") {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
-                name = "Current Trends",
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
-                name = "NDC Commitments",
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover("NDC Commitments"))
-  } else {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = "Current Trends",
-                line = list(color = COL_CT,  width = 2), marker = list(color = COL_CT,  size = 7),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = "NDC Commitments",
-                line = list(color = COL_NDC, width = 2), marker = list(color = COL_NDC, size = 7),
-                hovertemplate = hover("NDC Commitments"))
+  for (s in scenario_sel) {
+    dat   <- get_food_fable(variable, s, x_max)
+    hover <- paste0("%{x}: <b>%{y:.0f} Intake (kcal/cap/day)</b><extra>", s, "</extra>")
+    p <- add_scenario_trace(p, dat, s, scenario_colors[[s]], chart_type, hover)
   }
-  base_layout(p, paste0(variable, ": Current Trends vs NDC Commitments"),
+
+  base_layout(p, variable,
               x_max = x_max, y_range = y_range, y_label = cfg$y_label,
-              barmode = if (chart_type == "Bar chart") "group" else NULL)
-}
-
-make_food_single_plot <- function(variable, scenario_name, bar_color, x_max, y_range, chart_type) {
-  cfg        <- food_map[[variable]]
-  hover_tmpl <- paste0("%{x}: <b>%{y:.0f} Intake (kcal/cap/day)</b><extra>", scenario_name, "</extra>")
-  scen       <- get_food_fable(variable, scenario_name, x_max)
-
-  if (chart_type == "Bar chart") {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
-                marker = list(color = bar_color, line = list(color = "black", width = 1)),
-                hovertemplate = hover_tmpl)
-  } else if (chart_type == "Area chart") {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
-                name = scenario_name,
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover_tmpl)
-  } else {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = scenario_name,
-                line = list(color = bar_color, width = 2), marker = list(color = bar_color, size = 7),
-                hovertemplate = hover_tmpl)
-  }
-  base_layout(p, paste0(variable, ": ", scenario_name),
-              bar_color, x_max = x_max, y_range = y_range, y_label = cfg$y_label,
               barmode = if (chart_type == "Bar chart") "group" else NULL)
 }
 
@@ -1101,10 +838,7 @@ make_food_table_data <- function(variable, scenario_sel, x_max) {
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
   rows <- list()
-  if ("Current Trends" %in% scenario_sel)
-    rows[["Current Trends"]] <- pull_fable("Current Trends")
-  if ("NDC Commitments" %in% scenario_sel)
-    rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
+  for (s in scenario_sel) rows[[s]] <- pull_fable(s)
 
   mat <- do.call(rbind, rows)
   df  <- as.data.frame(mat)
@@ -1185,10 +919,8 @@ get_emiss_hist <- function(emiss_name, x_max) {
 }
 
 calc_emiss_y_range <- function(emiss_name, x_max, zero_base = TRUE) {
-  scen_vals <- bind_rows(
-    get_emiss_fable(emiss_name, "Current Trends",  x_max),
-    get_emiss_fable(emiss_name, "NDC Commitments", x_max)
-  )$value
+  scen_vals <- bind_rows(lapply(available_scenarios, get_emiss_fable,
+                                emiss_name = emiss_name, x_max = x_max))$value
   hist_vals <- get_emiss_hist(emiss_name, x_max)$value
   all_vals  <- c(scen_vals, hist_vals)
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
@@ -1196,82 +928,21 @@ calc_emiss_y_range <- function(emiss_name, x_max, zero_base = TRUE) {
   c(if (zero_base && y_min >= 0) 0 else y_min - pad, max(all_vals, na.rm = TRUE) + pad)
 }
 
-make_emiss_combined_plot <- function(emiss_name, x_max, y_range, chart_type) {
+make_emiss_plot <- function(emiss_name, scenario_sel, x_max, y_range, chart_type) {
   cfg       <- emissions_map[[emiss_name]]
-  ct        <- get_emiss_fable(emiss_name, "Current Trends",  x_max)
-  ndc       <- get_emiss_fable(emiss_name, "NDC Commitments", x_max)
+  p         <- plot_ly()
+
+  for (s in scenario_sel) {
+    dat   <- get_emiss_fable(emiss_name, s, x_max)
+    hover <- paste0("%{x}: <b>%{y:.2f} MtCO₂e</b><extra>", s, "</extra>")
+    p <- add_scenario_trace(p, dat, s, scenario_colors[[s]], chart_type, hover)
+  }
+
   hist_data <- get_emiss_hist(emiss_name, x_max)
-  hover     <- function(nm) paste0("%{x}: <b>%{y:.2f} MtCO₂e</b><extra>", nm, "</extra>")
-
-  if (chart_type == "Bar chart") {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "bar", name = "Current Trends",
-                marker = list(color = COL_CT,  line = list(color = "black", width = 1)),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "bar", name = "NDC Commitments",
-                marker = list(color = COL_NDC, line = list(color = "black", width = 1)),
-                hovertemplate = hover("NDC Commitments"))
-  } else if (chart_type == "Area chart") {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(COL_CT, 0.25),
-                name = "Current Trends",
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(COL_NDC, 0.25),
-                name = "NDC Commitments",
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover("NDC Commitments"))
-  } else {
-    p <- plot_ly() %>%
-      add_trace(data = ct,  x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = "Current Trends",
-                line = list(color = COL_CT, width = 2), marker = list(color = COL_CT, size = 7),
-                hovertemplate = hover("Current Trends")) %>%
-      add_trace(data = ndc, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = "NDC Commitments",
-                line = list(color = COL_NDC, width = 2), marker = list(color = COL_NDC, size = 7),
-                hovertemplate = hover("NDC Commitments"))
-  }
-  p <- p %>% add_hist_trace(hist_data, "SEEG13", chart_type, "MtCO₂e")
+  p <- add_hist_trace(p, hist_data, "SEEG13", chart_type, "MtCO₂e")
   year_min <- if (!is.null(cfg$year_min)) cfg$year_min else 2000L
-  base_layout(p, paste0(emiss_name, ": Current Trends vs NDC Commitments"),
+  base_layout(p, emiss_name,
               x_max = x_max, y_range = y_range, y_label = cfg$y_label,
-              barmode = if (chart_type == "Bar chart") "group" else NULL,
-              x_min = year_min,
-              zero_line = emiss_name == "CO₂ AFOLU")
-}
-
-make_emiss_single_plot <- function(emiss_name, scenario_name, bar_color, x_max, y_range, chart_type) {
-  cfg        <- emissions_map[[emiss_name]]
-  scen       <- get_emiss_fable(emiss_name, scenario_name, x_max)
-  hist_data  <- get_emiss_hist(emiss_name, x_max)
-  hover_tmpl <- paste0("%{x}: <b>%{y:.2f} MtCO₂e</b><extra>", scenario_name, "</extra>")
-
-  if (chart_type == "Bar chart") {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "bar", name = scenario_name,
-                marker = list(color = bar_color, line = list(color = "black", width = 1)),
-                hovertemplate = hover_tmpl)
-  } else if (chart_type == "Area chart") {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines",
-                fill = "tozeroy", fillcolor = hex_to_rgba(bar_color, 0.25),
-                name = scenario_name,
-                line = list(color = "black", width = 1.5),
-                hovertemplate = hover_tmpl)
-  } else {
-    p <- plot_ly() %>%
-      add_trace(data = scen, x = ~year, y = ~value, type = "scatter", mode = "lines+markers",
-                name = scenario_name,
-                line = list(color = bar_color, width = 2), marker = list(color = bar_color, size = 7),
-                hovertemplate = hover_tmpl)
-  }
-  p <- p %>% add_hist_trace(hist_data, "SEEG13", chart_type, "MtCO₂e")
-  year_min <- if (!is.null(cfg$year_min)) cfg$year_min else 2000L
-  base_layout(p, paste0(emiss_name, ": ", scenario_name),
-              bar_color, x_max = x_max, y_range = y_range, y_label = cfg$y_label,
               barmode = if (chart_type == "Bar chart") "group" else NULL,
               x_min = year_min,
               zero_line = emiss_name == "CO₂ AFOLU")
@@ -1286,10 +957,7 @@ make_emiss_table_data <- function(emiss_name, scenario_sel, x_max) {
     get_emiss_fable(emiss_name, scen_name, x_max) %>%
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
-  if ("Current Trends" %in% scenario_sel)
-    rows[["Current Trends"]] <- pull_fable("Current Trends")
-  if ("NDC Commitments" %in% scenario_sel)
-    rows[["NDC Commitments"]] <- pull_fable("NDC Commitments")
+  for (s in scenario_sel) rows[[s]] <- pull_fable(s)
 
   hist_all <- get_emiss_hist(emiss_name, 2020)
   rows[["Historical"]] <- sapply(years, function(y) {
@@ -1319,15 +987,10 @@ make_emiss_diff_data <- function(emiss_name, scenario_sel, type = "absolute") {
       filter(year %in% years) %>% arrange(year) %>% pull(value)
 
   rows <- list()
-  if ("Current Trends" %in% scenario_sel) {
-    v <- pull_fable("Current Trends")
-    rows[["Current Trends"]] <- if (type == "absolute") abs(v - hist_vals)
-                                else (v - hist_vals) / hist_vals * 100
-  }
-  if ("NDC Commitments" %in% scenario_sel) {
-    v <- pull_fable("NDC Commitments")
-    rows[["NDC Commitments"]] <- if (type == "absolute") abs(v - hist_vals)
-                                 else (v - hist_vals) / hist_vals * 100
+  for (s in scenario_sel) {
+    v <- pull_fable(s)
+    rows[[s]] <- if (type == "absolute") abs(v - hist_vals)
+                 else (v - hist_vals) / hist_vals * 100
   }
 
   mat <- do.call(rbind, rows)
@@ -1350,8 +1013,8 @@ addResourcePath("maps",   normalizePath("data/maps",   mustWork = FALSE))
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 ui <- page_navbar(
-  title = HTML('<span style="display:inline-flex; align-items:center; gap:8px;"><img src="images/fable_logo.png" height="26" style="border-radius:4px;">FABLE-Calculator Brazil v50</span>'),
-  window_title = "FABLE-Calculator Brazil v50",
+  title = HTML('<span style="display:inline-flex; align-items:center; gap:8px;"><img src="images/fable_logo.png" height="26" style="border-radius:4px;">FABLE-Calculator Brazil</span>'),
+  window_title = "FABLE-Calculator Brazil",
   header = tags$head(
     tags$link(rel = "icon", type = "image/svg+xml", href = "images/favicon.svg"),
     tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Raleway:wght@600&family=Montserrat:wght@400;500&display=swap"),
@@ -1397,14 +1060,26 @@ ui <- page_navbar(
         padding-top: 8px;
       }
       .bslib-sidebar-layout > .sidebar {
-        font-size: 0.8rem;
+        font-size: 0.72rem;
       }
       .bslib-sidebar-layout > .sidebar .control-label {
         font-weight: 600;
       }
       .selectize-input,
       .selectize-dropdown {
-        font-size: 0.8rem !important;
+        font-size: 0.72rem !important;
+      }
+      /* bslib's sidebar-content is a flex column with gap: 1rem between every
+         top-level child, ON TOP OF each control's own margin — that (not the
+         individual control margins) is the main source of large sidebar gaps. */
+      .bslib-sidebar-layout > .sidebar > .sidebar-content {
+        gap: 8px;
+      }
+      .bslib-sidebar-layout > .sidebar .shiny-input-container {
+        margin-bottom: 0;
+      }
+      .scen-group .shiny-input-container {
+        margin-bottom: 2px;
       }
       /* Maps tab — year button-group */
       #map_year.shiny-input-container { margin-bottom: 0; }
@@ -1464,6 +1139,50 @@ ui <- page_navbar(
         width: auto;
         height: auto;
       }
+      /* Breathing room before Years in the chart tabs, same as Layers gets
+         in the map tabs of the sister MAgPIE app. */
+      .years-group { margin-top: 8px; }
+      /* chart_type_ui() — icon-only Chart type dropdown (mirrors the sister
+         MAgPIE app's UI), replacing the old text-labelled radioButtons group.
+         The real Shiny-bound radioButtons is still there (see that function's
+         comment) but visually hidden; only the styled toggle button + dropdown
+         menu are visible. */
+      .chart-type-hidden-radio { display: none; }
+      .chart-type-toggle {
+        width: 34px; height: 30px; padding: 0; display: inline-flex;
+        align-items: center; justify-content: center;
+      }
+      .chart-type-toggle::after { display: none; }
+      .chart-type-dropdown .dropdown-item.active,
+      .chart-type-dropdown .dropdown-item:active {
+        background-color: #007B8A; color: white;
+      }
+      .chart-type-dropdown .dropdown-item i { width: 16px; text-align: center; margin-right: 4px; }
+    ")),
+    tags$script(HTML("
+      // Icon-only Chart type dropdown (chart_type_ui()) — the real Shiny
+      // input is a hidden radioButtons(); this just keeps the visible
+      // dropdown toggle/menu in sync with it. Every chart_type_ui() instance
+      // is part of the static sidebar UI (never (re)created via renderUI),
+      // so a single one-time binding on shiny:connected is enough.
+      $(document).on('shiny:connected', function() {
+        document.querySelectorAll('.chart-type-dropdown').forEach(function(dd) {
+          var fullId = dd.getAttribute('data-chart-id');
+          var toggle = dd.querySelector('.chart-type-toggle');
+          dd.querySelectorAll('.chart-type-item').forEach(function(item) {
+            item.addEventListener('click', function(e) {
+              e.preventDefault();
+              var val   = item.getAttribute('data-value');
+              var icon  = item.getAttribute('data-icon');
+              var radio = dd.querySelector('input[name=\"' + fullId + '\"][value=\"' + val + '\"]');
+              if (radio) { radio.checked = true; $(radio).trigger('change'); }
+              toggle.innerHTML = '<i class=\"fas fa-' + icon + '\"></i>';
+              dd.querySelectorAll('.chart-type-item').forEach(function(i2) { i2.classList.remove('active'); });
+              item.classList.add('active');
+            });
+          });
+        });
+      });
     "))
   ),
   theme = bs_theme(primary = "#007B8A", version = 5),
@@ -1475,16 +1194,12 @@ ui <- page_navbar(
         selectInput("class_sel", "Landuse Class",
                     choices  = names(landuse_map),
                     selected = "Forest"),
-        checkboxGroupInput("scenario_sel", "Scenario",
-                    choices  = c("Current Trends", "NDC Commitments"),
-                    selected = c("Current Trends", "NDC Commitments")),
-        radioButtons("years_sel", "Years",
-                    choices  = c("Calibration & Projections", "Calibration"),
-                    selected = "Calibration & Projections"),
-        radioButtons("chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart", "Area chart"),
-                    selected = "Line chart"),
-        checkboxInput("zero_base", "Start y-axis at zero", value = TRUE)
+        scenario_switches_ui("lu"),
+        div(class = "years-group",
+            tags$label("Years", class = "control-label"),
+            input_switch("years_sel", "Calibration Only", value = FALSE)),
+        checkboxInput("zero_base", "Start y-axis at zero", value = TRUE),
+        chart_type_ui("chart_type")
       ),
       uiOutput("charts_ui")
     )
@@ -1496,16 +1211,12 @@ ui <- page_navbar(
         selectInput("emiss_sel", "Emission",
                     choices  = names(emissions_map),
                     selected = "CO₂ AFOLU"),
-        checkboxGroupInput("emiss_scenario", "Scenario",
-                    choices  = c("Current Trends", "NDC Commitments"),
-                    selected = c("Current Trends", "NDC Commitments")),
-        radioButtons("emiss_years", "Years",
-                    choices  = c("Calibration & Projections", "Calibration"),
-                    selected = "Calibration & Projections"),
-        radioButtons("emiss_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart", "Area chart"),
-                    selected = "Line chart"),
-        checkboxInput("emiss_zero_base", "Start y-axis at zero", value = FALSE)
+        scenario_switches_ui("emiss"),
+        div(class = "years-group",
+            tags$label("Years", class = "control-label"),
+            input_switch("emiss_years", "Calibration Only", value = FALSE)),
+        checkboxInput("emiss_zero_base", "Start y-axis at zero", value = FALSE),
+        chart_type_ui("emiss_chart_type")
       ),
       uiOutput("emiss_charts_ui")
     )
@@ -1520,16 +1231,12 @@ ui <- page_navbar(
         selectInput("crop_type", "Type",
                     choices  = c("Area", "Production", "Yield"),
                     selected = "Area"),
-        checkboxGroupInput("crop_scenario", "Scenario",
-                    choices  = c("Current Trends", "NDC Commitments"),
-                    selected = c("Current Trends", "NDC Commitments")),
-        radioButtons("crop_years", "Years",
-                    choices  = c("Calibration & Projections", "Calibration"),
-                    selected = "Calibration & Projections"),
-        radioButtons("crop_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart", "Area chart"),
-                    selected = "Line chart"),
-        checkboxInput("crop_zero_base", "Start y-axis at zero", value = TRUE)
+        scenario_switches_ui("crop"),
+        div(class = "years-group",
+            tags$label("Years", class = "control-label"),
+            input_switch("crop_years", "Calibration Only", value = FALSE)),
+        checkboxInput("crop_zero_base", "Start y-axis at zero", value = TRUE),
+        chart_type_ui("crop_chart_type")
       ),
       uiOutput("crop_charts_ui")
     )
@@ -1543,16 +1250,12 @@ ui <- page_navbar(
                                  "Chicken Production", "Pork Production",
                                  "Cattle Herd", "Cattle Stocking Rate"),
                     selected = "Beef Production"),
-        checkboxGroupInput("live_scenario", "Scenario",
-                    choices  = c("Current Trends", "NDC Commitments"),
-                    selected = c("Current Trends", "NDC Commitments")),
-        radioButtons("live_years", "Years",
-                    choices  = c("Calibration & Projections", "Calibration"),
-                    selected = "Calibration & Projections"),
-        radioButtons("live_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart", "Area chart"),
-                    selected = "Line chart"),
-        checkboxInput("live_zero_base", "Start y-axis at zero", value = TRUE)
+        scenario_switches_ui("live"),
+        div(class = "years-group",
+            tags$label("Years", class = "control-label"),
+            input_switch("live_years", "Calibration Only", value = FALSE)),
+        checkboxInput("live_zero_base", "Start y-axis at zero", value = TRUE),
+        chart_type_ui("live_chart_type")
       ),
       uiOutput("live_charts_ui")
     )
@@ -1568,16 +1271,12 @@ ui <- page_navbar(
                     choices  = c("Soybeans (all)", "Soybeans (grain)", "Soybeans (cake)",
                                  "Soybeans (oil)", "Corn", "Beef"),
                     selected = "Soybeans (all)"),
-        checkboxGroupInput("trade_scenario", "Scenario",
-                    choices  = c("Current Trends", "NDC Commitments"),
-                    selected = c("Current Trends", "NDC Commitments")),
-        radioButtons("trade_years", "Years",
-                    choices  = c("Calibration & Projections", "Calibration"),
-                    selected = "Calibration & Projections"),
-        radioButtons("trade_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart", "Area chart"),
-                    selected = "Line chart"),
-        checkboxInput("trade_zero_base", "Start y-axis at zero", value = TRUE)
+        scenario_switches_ui("trade"),
+        div(class = "years-group",
+            tags$label("Years", class = "control-label"),
+            input_switch("trade_years", "Calibration Only", value = FALSE)),
+        checkboxInput("trade_zero_base", "Start y-axis at zero", value = TRUE),
+        chart_type_ui("trade_chart_type")
       ),
       uiOutput("trade_charts_ui")
     )
@@ -1589,16 +1288,12 @@ ui <- page_navbar(
         selectInput("food_variable", "Variable",
                     choices  = names(food_map),
                     selected = "Food Consumption"),
-        checkboxGroupInput("food_scenario", "Scenario",
-                    choices  = c("Current Trends", "NDC Commitments"),
-                    selected = c("Current Trends", "NDC Commitments")),
-        radioButtons("food_years", "Years",
-                    choices  = c("Calibration & Projections", "Calibration"),
-                    selected = "Calibration & Projections"),
-        radioButtons("food_chart_type", "Chart type",
-                    choices  = c("Line chart", "Bar chart", "Area chart"),
-                    selected = "Line chart"),
-        checkboxInput("food_zero_base", "Start y-axis at zero", value = TRUE)
+        scenario_switches_ui("food"),
+        div(class = "years-group",
+            tags$label("Years", class = "control-label"),
+            input_switch("food_years", "Calibration Only", value = FALSE)),
+        checkboxInput("food_zero_base", "Start y-axis at zero", value = TRUE),
+        chart_type_ui("food_chart_type")
       ),
       uiOutput("food_charts_ui")
     )
@@ -1640,18 +1335,62 @@ ui <- page_navbar(
 # ── Server ────────────────────────────────────────────────────────────────────
 server <- function(input, output, session) {
 
+  # ── Scenario switches, synced across every tab ──────────────────────────────
+  # Each tab renders its own copy of the scenario switches (scenario_switches_ui
+  # is called once per tab, giving each a distinct input id like
+  # "lu_scen_UP50...Current.Trends" / "emiss_scen_UP50...Current.Trends" / ...).
+  # Toggling one on any tab should reflect everywhere else, so a single shared
+  # reactiveValues (keyed by scenario label) acts as the source of truth: every
+  # tab's switch pushes its changes into it, and it pushes back out to every
+  # tab's switch whenever it changes. The `identical()` guards on both sides
+  # stop that round-trip from looping forever.
+  #
+  # `force(s)` (and `force(prefix)`) below are load-bearing, not defensive
+  # style: `observeEvent()`'s handler only runs later, on a deferred reactive
+  # flush — by then the `for` loop that called this helper has long since
+  # finished, so an unforced `s` parameter is still an unevaluated promise
+  # pointing at the *loop variable itself*, which every call shares. Forcing
+  # it up front freezes each call's own copy before the loop can move on.
+  SCENARIO_TAB_PREFIXES <- c("lu", "emiss", "crop", "live", "trade", "food")
+  scenario_state <- reactiveValues()
+  for (s in available_scenarios) scenario_state[[s]] <- s %in% default_scenarios
+
+  sync_switch_to_state <- function(prefix, s) {
+    force(prefix); force(s)
+    input_id <- paste0(prefix, "_scen_", make.names(s))
+    observeEvent(input[[input_id]], {
+      if (!identical(scenario_state[[s]], input[[input_id]]))
+        scenario_state[[s]] <- input[[input_id]]
+    }, ignoreInit = TRUE)
+  }
+  for (prefix in SCENARIO_TAB_PREFIXES) for (s in available_scenarios) sync_switch_to_state(prefix, s)
+
+  sync_state_to_switches <- function(s) {
+    force(s)
+    observeEvent(scenario_state[[s]], {
+      for (prefix in SCENARIO_TAB_PREFIXES) {
+        input_id <- paste0(prefix, "_scen_", make.names(s))
+        if (!identical(input[[input_id]], scenario_state[[s]]))
+          update_switch(input_id, value = scenario_state[[s]], session = session)
+      }
+    }, ignoreInit = TRUE)
+  }
+  for (s in available_scenarios) sync_state_to_switches(s)
+
   x_max <- reactive({
-    if (input$years_sel == "Calibration") 2020L else 2050L
+    if (isTRUE(input$years_sel)) 2020L else 2050L
   })
 
   y_range <- reactive({
     calc_y_range(input$class_sel, x_max(), input$zero_base)
   })
 
+  lu_scen_sel <- reactive(get_selected_scenarios_r(input, "lu"))
+
   output$charts_ui <- renderUI({
     y_label <- landuse_map[[input$class_sel]]$y_label
 
-    right_col <- if (input$years_sel == "Calibration") {
+    right_col <- if (isTRUE(input$years_sel)) {
       tagList(
         div(style = "display:flex; align-items:center; gap:8px;",
             strong(y_label),
@@ -1677,13 +1416,8 @@ server <- function(input, output, session) {
       )
     }
 
-    req(length(input$scenario_sel) > 0)
-    chart_out <- if (all(c("Current Trends", "NDC Commitments") %in% input$scenario_sel))
-      plotlyOutput("plot_both", height = "460px")
-    else if ("Current Trends" %in% input$scenario_sel)
-      plotlyOutput("plot_ct",   height = "460px")
-    else
-      plotlyOutput("plot_ndc",  height = "460px")
+    req(length(lu_scen_sel()) > 0)
+    chart_out <- plotlyOutput("plot_main", height = "460px")
     if (x_max() == 2050) {
       tagList(
         fluidRow(column(6, chart_out)),
@@ -1695,45 +1429,41 @@ server <- function(input, output, session) {
   })
 
   output$data_table <- renderTable(
-    make_table_data(input$class_sel, input$scenario_sel, x_max()),
+    make_table_data(input$class_sel, lu_scen_sel(), x_max()),
     digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
 
   output$abs_diff_table <- renderTable(
-    make_diff_data(input$class_sel, input$scenario_sel, "absolute"),
+    make_diff_data(input$class_sel, lu_scen_sel(), "absolute"),
     digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
 
   output$rel_diff_table <- renderTable(
-    make_rel_diff_colored(input$class_sel, input$scenario_sel),
+    make_rel_diff_colored(input$class_sel, lu_scen_sel()),
     sanitize.text.function = identity,
     na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
   output$landuse_dl <- downloadHandler(
     filename = function() {
       nm <- gsub(" ", "_", input$class_sel)
-      sc <- if (length(input$scenario_sel) == 2) "Both" else gsub(" ", "_", input$scenario_sel)
+      sc <- if (length(lu_scen_sel()) == length(available_scenarios)) "All"
+            else paste(gsub(" ", "_", lu_scen_sel()), collapse = "_")
       paste0("landuse_", nm, "_", sc, "_", x_max(), ".csv")
     },
     content = function(file) {
-      write.csv(make_table_data(input$class_sel, input$scenario_sel, x_max()),
+      write.csv(make_table_data(input$class_sel, lu_scen_sel(), x_max()),
                 file, row.names = FALSE)
     }
   )
 
-  output$plot_both <- renderPlotly({
-    make_combined_plot(input$class_sel, x_max(), y_range(), input$chart_type)
-  })
-  output$plot_ct <- renderPlotly({
-    make_single_plot(input$class_sel, "Current Trends",  COL_CT,  x_max(), y_range(), input$chart_type)
-  })
-  output$plot_ndc <- renderPlotly({
-    make_single_plot(input$class_sel, "NDC Commitments", COL_NDC, x_max(), y_range(), input$chart_type)
+  output$plot_main <- renderPlotly({
+    req(length(lu_scen_sel()) > 0)
+    make_plot(input$class_sel, lu_scen_sel(), x_max(), y_range(), input$chart_type)
   })
 
   # ── Crops tab ────────────────────────────────────────────────────────────────
   crop_x_max <- reactive({
-    if (input$crop_years == "Calibration") 2020L else 2050L
+    if (isTRUE(input$crop_years)) 2020L else 2050L
   })
 
   crop_y_range <- reactive({
@@ -1741,13 +1471,15 @@ server <- function(input, output, session) {
     calc_crop_y_range(input$crop_name, input$crop_type, crop_x_max(), input$crop_zero_base)
   })
 
+  crop_scen_sel <- reactive(get_selected_scenarios_r(input, "crop"))
+
   output$crop_charts_ui <- renderUI({
     req(length(crops_map) > 0)
     y_label   <- crop_y_label[[input$crop_type]]
     abs_unit  <- crop_hover_unit[[input$crop_type]]
     abs_title <- paste0("Absolute Difference (", abs_unit, ")")
 
-    right_col <- if (input$crop_years == "Calibration") {
+    right_col <- if (isTRUE(input$crop_years)) {
       tagList(
         div(style = "display:flex; align-items:center; gap:8px;",
             strong(y_label),
@@ -1773,13 +1505,8 @@ server <- function(input, output, session) {
       )
     }
 
-    req(length(input$crop_scenario) > 0)
-    chart_out <- if (all(c("Current Trends", "NDC Commitments") %in% input$crop_scenario))
-      plotlyOutput("crop_plot_both", height = "460px")
-    else if ("Current Trends" %in% input$crop_scenario)
-      plotlyOutput("crop_plot_ct",   height = "460px")
-    else
-      plotlyOutput("crop_plot_ndc",  height = "460px")
+    req(length(crop_scen_sel()) > 0)
+    chart_out <- plotlyOutput("crop_plot_main", height = "460px")
     if (crop_x_max() == 2050) {
       tagList(
         fluidRow(column(6, chart_out)),
@@ -1791,43 +1518,39 @@ server <- function(input, output, session) {
   })
 
   output$crop_data_table <- renderTable(
-    make_crop_table_data(input$crop_name, input$crop_type, input$crop_scenario, crop_x_max()),
+    make_crop_table_data(input$crop_name, input$crop_type, crop_scen_sel(), crop_x_max()),
     digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
   output$crop_abs_diff_table <- renderTable(
-    make_crop_diff_data(input$crop_name, input$crop_type, input$crop_scenario, "absolute"),
+    make_crop_diff_data(input$crop_name, input$crop_type, crop_scen_sel(), "absolute"),
     digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
   output$crop_rel_diff_table <- renderTable(
-    make_crop_rel_diff_colored(input$crop_name, input$crop_type, input$crop_scenario),
+    make_crop_rel_diff_colored(input$crop_name, input$crop_type, crop_scen_sel()),
     sanitize.text.function = identity,
     na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
   output$crop_dl <- downloadHandler(
     filename = function() {
-      sc <- if (length(input$crop_scenario) == 2) "Both" else gsub(" ", "_", input$crop_scenario)
+      sc <- if (length(crop_scen_sel()) == length(available_scenarios)) "All"
+            else paste(gsub(" ", "_", crop_scen_sel()), collapse = "_")
       paste0("crops_", gsub(" ", "_", input$crop_name), "_",
              input$crop_type, "_", sc, "_", crop_x_max(), ".csv")
     },
     content = function(file) {
       write.csv(make_crop_table_data(input$crop_name, input$crop_type,
-                                     input$crop_scenario, crop_x_max()),
+                                     crop_scen_sel(), crop_x_max()),
                 file, row.names = FALSE)
     }
   )
-  output$crop_plot_both <- renderPlotly({
-    make_crop_combined_plot(input$crop_name, input$crop_type, crop_x_max(), crop_y_range(), input$crop_chart_type)
-  })
-  output$crop_plot_ct <- renderPlotly({
-    make_crop_single_plot(input$crop_name, input$crop_type, "Current Trends",  COL_CT,  crop_x_max(), crop_y_range(), input$crop_chart_type)
-  })
-  output$crop_plot_ndc <- renderPlotly({
-    make_crop_single_plot(input$crop_name, input$crop_type, "NDC Commitments", COL_NDC, crop_x_max(), crop_y_range(), input$crop_chart_type)
+  output$crop_plot_main <- renderPlotly({
+    req(length(crop_scen_sel()) > 0)
+    make_crop_plot(input$crop_name, input$crop_type, crop_scen_sel(), crop_x_max(), crop_y_range(), input$crop_chart_type)
   })
 
   # ── Livestock tab ─────────────────────────────────────────────────────────────
   live_x_max <- reactive({
-    if (input$live_years == "Calibration") 2020L else 2050L
+    if (isTRUE(input$live_years)) 2020L else 2050L
   })
 
   live_y_range <- reactive({
@@ -1835,13 +1558,15 @@ server <- function(input, output, session) {
     calc_live_y_range(input$live_product, live_x_max(), input$live_zero_base)
   })
 
+  live_scen_sel <- reactive(get_selected_scenarios_r(input, "live"))
+
   output$live_charts_ui <- renderUI({
     req(length(livestock_map) > 0)
     has_hist <- livestock_map[[input$live_product]]$has_hist
 
     y_lbl     <- livestock_map[[input$live_product]]$y_label
     unit_lbl  <- livestock_map[[input$live_product]]$unit_label
-    right_col <- if (input$live_years == "Calibration" && has_hist) {
+    right_col <- if (isTRUE(input$live_years) && has_hist) {
       tagList(
         div(style = "display:flex; align-items:center; gap:8px;",
             strong(y_lbl),
@@ -1867,13 +1592,8 @@ server <- function(input, output, session) {
       )
     }
 
-    req(length(input$live_scenario) > 0)
-    chart_out <- if (all(c("Current Trends", "NDC Commitments") %in% input$live_scenario))
-      plotlyOutput("live_plot_both", height = "460px")
-    else if ("Current Trends" %in% input$live_scenario)
-      plotlyOutput("live_plot_ct",   height = "460px")
-    else
-      plotlyOutput("live_plot_ndc",  height = "460px")
+    req(length(live_scen_sel()) > 0)
+    chart_out <- plotlyOutput("live_plot_main", height = "460px")
     if (live_x_max() == 2050) {
       tagList(
         fluidRow(column(6, chart_out)),
@@ -1885,36 +1605,32 @@ server <- function(input, output, session) {
   })
 
   output$live_data_table <- renderTable(
-    make_live_table_data(input$live_product, input$live_scenario, live_x_max()),
+    make_live_table_data(input$live_product, live_scen_sel(), live_x_max()),
     digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
   output$live_abs_diff_table <- renderTable(
-    make_live_diff_data(input$live_product, input$live_scenario, "absolute"),
+    make_live_diff_data(input$live_product, live_scen_sel(), "absolute"),
     digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
   output$live_rel_diff_table <- renderTable(
-    make_live_rel_diff_colored(input$live_product, input$live_scenario),
+    make_live_rel_diff_colored(input$live_product, live_scen_sel()),
     sanitize.text.function = identity,
     na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
   output$live_dl <- downloadHandler(
     filename = function() {
-      sc <- if (length(input$live_scenario) == 2) "Both" else gsub(" ", "_", input$live_scenario)
+      sc <- if (length(live_scen_sel()) == length(available_scenarios)) "All"
+            else paste(gsub(" ", "_", live_scen_sel()), collapse = "_")
       paste0("livestock_", gsub(" ", "_", input$live_product), "_", sc, "_", live_x_max(), ".csv")
     },
     content = function(file) {
-      write.csv(make_live_table_data(input$live_product, input$live_scenario, live_x_max()),
+      write.csv(make_live_table_data(input$live_product, live_scen_sel(), live_x_max()),
                 file, row.names = FALSE)
     }
   )
-  output$live_plot_both <- renderPlotly({
-    make_live_combined_plot(input$live_product, live_x_max(), live_y_range(), input$live_chart_type)
-  })
-  output$live_plot_ct <- renderPlotly({
-    make_live_single_plot(input$live_product, "Current Trends",  COL_CT,  live_x_max(), live_y_range(), input$live_chart_type)
-  })
-  output$live_plot_ndc <- renderPlotly({
-    make_live_single_plot(input$live_product, "NDC Commitments", COL_NDC, live_x_max(), live_y_range(), input$live_chart_type)
+  output$live_plot_main <- renderPlotly({
+    req(length(live_scen_sel()) > 0)
+    make_live_plot(input$live_product, live_scen_sel(), live_x_max(), live_y_range(), input$live_chart_type)
   })
 
   # ── Trade tab ─────────────────────────────────────────────────────────────────
@@ -1926,7 +1642,7 @@ server <- function(input, output, session) {
   })
 
   trade_x_max <- reactive({
-    if (input$trade_years == "Calibration") 2020L else 2050L
+    if (isTRUE(input$trade_years)) 2020L else 2050L
   })
 
   trade_y_range <- reactive({
@@ -1934,6 +1650,8 @@ server <- function(input, output, session) {
         input$trade_product %in% trade_map[[input$trade_type]]$products)
     calc_trade_y_range(input$trade_type, input$trade_product, trade_x_max(), input$trade_zero_base)
   })
+
+  trade_scen_sel <- reactive(get_selected_scenarios_r(input, "trade"))
 
   output$trade_charts_ui <- renderUI({
     req(input$trade_type %in% names(trade_map),
@@ -1948,13 +1666,8 @@ server <- function(input, output, session) {
           tableOutput("trade_data_table"))
     )
 
-    req(length(input$trade_scenario) > 0)
-    chart_out <- if (all(c("Current Trends", "NDC Commitments") %in% input$trade_scenario))
-      plotlyOutput("trade_plot_both", height = "460px")
-    else if ("Current Trends" %in% input$trade_scenario)
-      plotlyOutput("trade_plot_ct",   height = "460px")
-    else
-      plotlyOutput("trade_plot_ndc",  height = "460px")
+    req(length(trade_scen_sel()) > 0)
+    chart_out <- plotlyOutput("trade_plot_main", height = "460px")
     if (trade_x_max() == 2050) {
       tagList(
         fluidRow(column(6, chart_out)),
@@ -1967,43 +1680,39 @@ server <- function(input, output, session) {
 
   output$trade_data_table <- renderTable(
     make_trade_table_data(input$trade_type, input$trade_product,
-                          input$trade_scenario, trade_x_max()),
+                          trade_scen_sel(), trade_x_max()),
     digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
   output$trade_dl <- downloadHandler(
     filename = function() {
       prod <- gsub("[() ]", "_", input$trade_product)
-      sc <- if (length(input$trade_scenario) == 2) "Both" else gsub(" ", "_", input$trade_scenario)
+      sc <- if (length(trade_scen_sel()) == length(available_scenarios)) "All"
+            else paste(gsub(" ", "_", trade_scen_sel()), collapse = "_")
       paste0("trade_", input$trade_type, "_", prod, "_", sc, "_", trade_x_max(), ".csv")
     },
     content = function(file) {
       write.csv(make_trade_table_data(input$trade_type, input$trade_product,
-                                      input$trade_scenario, trade_x_max()),
+                                      trade_scen_sel(), trade_x_max()),
                 file, row.names = FALSE)
     }
   )
-  output$trade_plot_both <- renderPlotly({
-    make_trade_combined_plot(input$trade_type, input$trade_product,
-                             trade_x_max(), trade_y_range(), input$trade_chart_type)
-  })
-  output$trade_plot_ct <- renderPlotly({
-    make_trade_single_plot(input$trade_type, input$trade_product, "Current Trends",
-                           COL_CT, trade_x_max(), trade_y_range(), input$trade_chart_type)
-  })
-  output$trade_plot_ndc <- renderPlotly({
-    make_trade_single_plot(input$trade_type, input$trade_product, "NDC Commitments",
-                           COL_NDC, trade_x_max(), trade_y_range(), input$trade_chart_type)
+  output$trade_plot_main <- renderPlotly({
+    req(length(trade_scen_sel()) > 0)
+    make_trade_plot(input$trade_type, input$trade_product,
+                    trade_scen_sel(), trade_x_max(), trade_y_range(), input$trade_chart_type)
   })
 
   # ── Food tab ──────────────────────────────────────────────────────────────────
   food_x_max <- reactive({
-    if (input$food_years == "Calibration") 2020L else 2050L
+    if (isTRUE(input$food_years)) 2020L else 2050L
   })
 
   food_y_range <- reactive({
     req(input$food_variable %in% names(food_map))
     calc_food_y_range(input$food_variable, food_x_max(), input$food_zero_base)
   })
+
+  food_scen_sel <- reactive(get_selected_scenarios_r(input, "food"))
 
   output$food_charts_ui <- renderUI({
     req(input$food_variable %in% names(food_map))
@@ -2018,13 +1727,8 @@ server <- function(input, output, session) {
           tableOutput("food_data_table"))
     )
 
-    req(length(input$food_scenario) > 0)
-    chart_out <- if (all(c("Current Trends", "NDC Commitments") %in% input$food_scenario))
-      plotlyOutput("food_plot_both", height = "460px")
-    else if ("Current Trends" %in% input$food_scenario)
-      plotlyOutput("food_plot_ct",   height = "460px")
-    else
-      plotlyOutput("food_plot_ndc",  height = "460px")
+    req(length(food_scen_sel()) > 0)
+    chart_out <- plotlyOutput("food_plot_main", height = "460px")
     if (food_x_max() == 2050) {
       tagList(
         fluidRow(column(6, chart_out)),
@@ -2036,38 +1740,36 @@ server <- function(input, output, session) {
   })
 
   output$food_data_table <- renderTable(
-    make_food_table_data(input$food_variable, input$food_scenario, food_x_max()),
+    make_food_table_data(input$food_variable, food_scen_sel(), food_x_max()),
     digits = 0, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
   output$food_dl <- downloadHandler(
     filename = function() {
-      sc <- if (length(input$food_scenario) == 2) "Both" else gsub(" ", "_", input$food_scenario)
+      sc <- if (length(food_scen_sel()) == length(available_scenarios)) "All"
+            else paste(gsub(" ", "_", food_scen_sel()), collapse = "_")
       paste0("food_", gsub(" ", "_", input$food_variable), "_", sc, "_", food_x_max(), ".csv")
     },
     content = function(file) {
-      write.csv(make_food_table_data(input$food_variable, input$food_scenario, food_x_max()),
+      write.csv(make_food_table_data(input$food_variable, food_scen_sel(), food_x_max()),
                 file, row.names = FALSE)
     }
   )
-  output$food_plot_both <- renderPlotly({
-    make_food_combined_plot(input$food_variable, food_x_max(), food_y_range(), input$food_chart_type)
-  })
-  output$food_plot_ct <- renderPlotly({
-    make_food_single_plot(input$food_variable, "Current Trends",  COL_CT,  food_x_max(), food_y_range(), input$food_chart_type)
-  })
-  output$food_plot_ndc <- renderPlotly({
-    make_food_single_plot(input$food_variable, "NDC Commitments", COL_NDC, food_x_max(), food_y_range(), input$food_chart_type)
+  output$food_plot_main <- renderPlotly({
+    req(length(food_scen_sel()) > 0)
+    make_food_plot(input$food_variable, food_scen_sel(), food_x_max(), food_y_range(), input$food_chart_type)
   })
 
   # ── Emissions tab ─────────────────────────────────────────────────────────────
   emiss_x_max <- reactive({
-    if (input$emiss_years == "Calibration") 2020L else 2050L
+    if (isTRUE(input$emiss_years)) 2020L else 2050L
   })
 
   emiss_y_range <- reactive({
     req(length(emissions_map) > 0, input$emiss_sel %in% names(emissions_map))
     calc_emiss_y_range(input$emiss_sel, emiss_x_max(), input$emiss_zero_base)
   })
+
+  emiss_scen_sel <- reactive(get_selected_scenarios_r(input, "emiss"))
 
   observeEvent(input$emiss_sel, {
     updateCheckboxInput(session, "emiss_zero_base",
@@ -2078,7 +1780,7 @@ server <- function(input, output, session) {
     req(length(emissions_map) > 0)
     y_label <- emissions_map[[input$emiss_sel]]$y_label
 
-    right_col <- if (input$emiss_years == "Calibration") {
+    right_col <- if (isTRUE(input$emiss_years)) {
       tagList(
         div(style = "display:flex; align-items:center; gap:8px;",
             strong(y_label),
@@ -2104,13 +1806,8 @@ server <- function(input, output, session) {
       )
     }
 
-    req(length(input$emiss_scenario) > 0)
-    chart_out <- if (all(c("Current Trends", "NDC Commitments") %in% input$emiss_scenario))
-      plotlyOutput("emiss_plot_both", height = "460px")
-    else if ("Current Trends" %in% input$emiss_scenario)
-      plotlyOutput("emiss_plot_ct",   height = "460px")
-    else
-      plotlyOutput("emiss_plot_ndc",  height = "460px")
+    req(length(emiss_scen_sel()) > 0)
+    chart_out <- plotlyOutput("emiss_plot_main", height = "460px")
     if (emiss_x_max() == 2050) {
       tagList(
         fluidRow(column(6, chart_out)),
@@ -2122,37 +1819,33 @@ server <- function(input, output, session) {
   })
 
   output$emiss_data_table <- renderTable(
-    make_emiss_table_data(input$emiss_sel, input$emiss_scenario, emiss_x_max()),
+    make_emiss_table_data(input$emiss_sel, emiss_scen_sel(), emiss_x_max()),
     digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
   output$emiss_abs_diff_table <- renderTable(
-    make_emiss_diff_data(input$emiss_sel, input$emiss_scenario, "absolute"),
+    make_emiss_diff_data(input$emiss_sel, emiss_scen_sel(), "absolute"),
     digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
   output$emiss_rel_diff_table <- renderTable(
-    make_emiss_rel_diff_colored(input$emiss_sel, input$emiss_scenario),
+    make_emiss_rel_diff_colored(input$emiss_sel, emiss_scen_sel()),
     sanitize.text.function = identity,
     na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
   output$emiss_dl <- downloadHandler(
     filename = function() {
       nm <- gsub(" ", "_", input$emiss_sel)
-      sc <- if (length(input$emiss_scenario) == 2) "Both" else gsub(" ", "_", input$emiss_scenario)
+      sc <- if (length(emiss_scen_sel()) == length(available_scenarios)) "All"
+            else paste(gsub(" ", "_", emiss_scen_sel()), collapse = "_")
       paste0("emissions_", nm, "_", sc, "_", emiss_x_max(), ".csv")
     },
     content = function(file) {
-      write.csv(make_emiss_table_data(input$emiss_sel, input$emiss_scenario, emiss_x_max()),
+      write.csv(make_emiss_table_data(input$emiss_sel, emiss_scen_sel(), emiss_x_max()),
                 file, row.names = FALSE)
     }
   )
-  output$emiss_plot_both <- renderPlotly({
-    make_emiss_combined_plot(input$emiss_sel, emiss_x_max(), emiss_y_range(), input$emiss_chart_type)
-  })
-  output$emiss_plot_ct <- renderPlotly({
-    make_emiss_single_plot(input$emiss_sel, "Current Trends",  COL_CT,  emiss_x_max(), emiss_y_range(), input$emiss_chart_type)
-  })
-  output$emiss_plot_ndc <- renderPlotly({
-    make_emiss_single_plot(input$emiss_sel, "NDC Commitments", COL_NDC, emiss_x_max(), emiss_y_range(), input$emiss_chart_type)
+  output$emiss_plot_main <- renderPlotly({
+    req(length(emiss_scen_sel()) > 0)
+    make_emiss_plot(input$emiss_sel, emiss_scen_sel(), emiss_x_max(), emiss_y_range(), input$emiss_chart_type)
   })
 
   # ── Maps tab ──────────────────────────────────────────────────────────────────

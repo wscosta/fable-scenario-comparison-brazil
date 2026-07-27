@@ -1,15 +1,21 @@
 # 🌿 FABLE Calculator — Scenario Comparison (Brazil)
 
-An interactive R Shiny app to compare two [FABLE Calculator](https://fableconsortium.org/tools/fablecalculators/) land-use scenarios for Brazil against observed historical data.
+An interactive R Shiny app to compare any number of [FABLE Calculator](https://fableconsortium.org/tools/fablecalculators/) land-use scenarios for Brazil against observed historical data.
 
 ## 📋 Overview
 
-The FABLE Calculator is a spreadsheet-based land-use modelling tool developed by the FABLE Consortium to explore national pathways toward sustainable food and land-use systems. This project reads two Brazil-specific scenario files and overlays their outputs with historical reference data (2000–2020), enabling visual comparison across land-use classes and time periods.
+The FABLE Calculator is a spreadsheet-based land-use modelling tool developed by the FABLE Consortium to explore national pathways toward sustainable food and land-use systems. This project reads any number of Brazil-specific scenario files (configured in `data/xlsx/scenarios.csv`) and overlays their outputs with historical reference data (2000–2020), enabling visual comparison across land-use classes and time periods.
+
+The app ships with four scenarios — two calibrations (UP50, UP48), each with two pathways:
 
 | Scenario | Description |
 |----------|-------------|
-| **Current Trends** | Business-as-usual trajectory |
-| **NDC Commitments** | Nationally Determined Contribution targets |
+| **UP50 - Current Trends** | Business-as-usual trajectory, UP50 calibration |
+| **UP50 - NDC Commitments** | Nationally Determined Contribution targets, UP50 calibration |
+| **UP48 - Current Trends** | Business-as-usual trajectory, UP48 calibration |
+| **UP48 - NDC Commitments** | Nationally Determined Contribution targets, UP48 calibration |
+
+Adding more scenarios (another UP calibration, another policy pathway, …) is just a new xlsx file plus a new row in `scenarios.csv` — no code changes needed. See [🗂️ Managing scenarios](#️-managing-scenarios) below.
 
 ## ⚙️ Requirements
 
@@ -53,15 +59,33 @@ All three launchers auto-detect their own location and open the browser automati
 
 | File | Location | Description |
 |------|----------|-------------|
-| FABLE Calculator — Current Trends | `data/xlsx/` | FABLE Calculator spreadsheet (Current Trends pathway) |
-| FABLE Calculator — NDC Commitments | `data/xlsx/` | FABLE Calculator spreadsheet (NDC Commitments pathway) |
+| Scenario metadata | `data/xlsx/scenarios.csv` | Maps each xlsx file to its display label — the single source of truth for which scenarios exist and in what order (see [🗂️ Managing scenarios](#️-managing-scenarios)) |
+| FABLE Calculator spreadsheet(s) | `data/xlsx/` | One `.xlsx` per scenario listed in `scenarios.csv` |
 | Historical reference data | `data/csv/` | Long-format CSV (`histdatabrazil.csv`) with observed data for Brazil |
 | LUC transition matrix — CT | `data/luc/` | Downscaled land-use change data for Current Trends (`downscaled_LUC_mapbiomas_ct.rds`) |
 | LUC transition matrix — NDC | `data/luc/` | Downscaled land-use change data for NDC Commitments (`downscaled_LUC_mapbiomas_ndc.rds`) |
 | Cell ID raster | `data/luc/` | `id_raster.tif` — maps FABLE cell IDs to a 0.05° raster grid |
 | State and biome boundaries | `data/shapefiles/` | `br_states.shp`, `br_biomes.shp` — shapefile overlays for maps |
 
-File names for the FABLE Calculator spreadsheets are configured at the top of `01_process_data.R`.
+> ⚠️ **Not yet scenario-generic:** the Maps tab (Land Cover / Outflows / Transitions) still only knows about a fixed `ct`/`ndc` pair, independent of what's in `scenarios.csv` — it doesn't pick up UP48, or any other scenario added since. This is planned for a future update; see [🌎 Shiny app — Maps tab](#-shiny-app--maps-tab) below for the current, unchanged behaviour.
+
+## 🗂️ Managing scenarios
+
+`data/xlsx/scenarios.csv` drives everything: which xlsx files get read, what they're labelled in the UI, and the order they appear in (switches, legend, table rows, chart colours are all assigned in this row order).
+
+```csv
+file,label,up
+FABLECalculator_BRA_UP50_CurrentTrends.xlsx,UP50 - Current Trends,50
+FABLECalculator_BRA_UP50_NDC.xlsx,UP50 - NDC Commitments,50
+FABLECalculator_BRA_UP48_CurrentTrends.xlsx,UP48 - Current Trends,48
+FABLECalculator_BRA_UP48_NDC.xlsx,UP48 - NDC Commitments,48
+```
+
+**To add a scenario:** drop the new `.xlsx` file into `data/xlsx/` and add a row to `scenarios.csv` with its filename and display label. The app detects the change automatically on next launch (comparing the scenario labels on disk to what's cached in `data/processed/`) and reprocesses if needed — no need to delete `data/processed/` by hand, though doing so also works. Any number of scenarios can be selected at once via the **Scenario** switches on each tab.
+
+**Default-on scenarios:** the optional `up` column controls which switches start checked — only the rows with the *highest* `up` value default to on (currently the two UP50 rows); everything else starts off but is still selectable. Adding a new, higher-numbered UP row automatically becomes the new default the next time the app launches, no code changes needed. Omitting the `up` column entirely makes every scenario default to checked.
+
+**Switches stay in sync across tabs:** toggling a scenario on or off on any tab (Land Use, Emissions, Crops, Livestock, Trade, Food) applies the same change everywhere else — there's one shared selection, not six independent ones.
 
 ## 📁 Repository structure
 
@@ -89,6 +113,7 @@ fable-scenario-comparison-brazil/
 │   │   ├── br_states.shp                    # Brazilian state boundaries
 │   │   └── br_biomes.shp                    # Brazilian biome boundaries
 │   └── xlsx/
+│       ├── scenarios.csv                       # Scenario file → label mapping (drives everything)
 │       ├── FABLECalculator_BRA_UP50_CurrentTrends.xlsx
 │       └── FABLECalculator_BRA_UP50_NDC.xlsx
 ├── 01_process_data.R                        # Data ingestion and processing
@@ -148,7 +173,7 @@ Requires `ggplot2`, `officer`, and `flextable` in addition to the packages used 
 
 ## 📥 Downloading data
 
-Every tab has a **CSV** button next to the values table header. Clicking it downloads the currently displayed table (selected variable, scenario, and year range) as a `.csv` file. The filename encodes the current selection, e.g. `landuse_Forest_Both_2050.csv`.
+Every tab has a **CSV** button next to the values table header. Clicking it downloads the currently displayed table (selected variable, scenario, and year range) as a `.csv` file. The filename encodes the current selection, e.g. `landuse_Forest_All_2050.csv` when every scenario is selected, or `landuse_Forest_Current_Trends_2050.csv` for a single one.
 
 ## 🚀 Usage
 
@@ -176,13 +201,13 @@ source("01_process_data.R")
 
 The app uses **Bootstrap 5** via the `bslib` package. The navbar displays in two rows — app title on the first line and tab names on the second. The navbar background is a five-stop Brazil flag gradient (`#2E7D32 → #C8A000 → #002776 → #C8A000 → #2E7D32`) with white text and a subtle drop shadow. The FCID logo is pinned to the right of the navbar spanning both rows. The title uses **Raleway** (bold) and the tab labels use **Montserrat** (medium), both loaded from Google Fonts. Interactive elements (active tabs, focused inputs, buttons) use the turquoise accent (`#007B8A`).
 
-Controls are grouped in a **sidebar panel** on the left of each tab. Scenario, Years, and Chart type are shown as radio buttons; the variable selector (land-use class, emission type, crop, etc.) uses a dropdown. Sidebar labels are bold without trailing colons. A **Start y-axis at zero** checkbox controls whether the y-axis is forced to start at zero (checked by default) or auto-scaled to the data range. For CO₂ AFOLU, the checkbox is unchecked by default and resets automatically when switching to that emission, since its values can be negative.
+Controls are grouped in a **sidebar panel** on the left of each tab. **Scenario** is shown as one on/off switch per scenario (any number can be selected at once); **Years** is a single "Calibration Only" switch (off = 2000–2050, on = 2000–2020); **Chart type** is an icon-only dropdown button (line/bar/area icons) rather than a text-labelled radio group; the variable selector (land-use class, emission type, crop, etc.) uses a dropdown. Sidebar labels are bold without trailing colons. A **Start y-axis at zero** checkbox controls whether the y-axis is forced to start at zero (checked by default) or auto-scaled to the data range. For CO₂ AFOLU, the checkbox is unchecked by default and resets automatically when switching to that emission, since its values can be negative.
 
 All tabs support three **Chart types**:
 
 | Type | Description |
 |------|-------------|
-| **Line chart** | Lines with markers; scenario colours (blue CT, green NDC); historical in black |
+| **Line chart** | Lines with markers; one colour per scenario (assigned automatically from a fixed palette, in `scenarios.csv` order); historical in black |
 | **Bar chart** | Grouped bars with black border; historical in near-black (`#1a1a1a`) |
 | **Area chart** | Filled area to y = 0; semi-transparent fill (25% opacity) in scenario colours; black border line; historical as dashed black line without fill |
 
@@ -193,9 +218,9 @@ The controls are displayed in this order:
 | Control | Type | Options |
 |---------|------|---------|
 | **Landuse Class** | Dropdown | Cropland · Pasture · Forest · Other Land · Urban |
-| **Scenario** | Radio | Both · Current Trends · NDC Commitments |
-| **Years** | Radio | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
-| **Chart type** | Radio | Line chart · Bar chart |
+| **Scenario** | Switches | One per scenario in `scenarios.csv`; any number on at once |
+| **Years** | Switch | "Calibration Only" — off = 2000–2050, on = 2000–2020 |
+| **Chart type** | Icon dropdown | Line chart · Bar chart · Area chart |
 
 ### Layout
 
@@ -206,9 +231,8 @@ The chart always appears on the left. The data table position depends on the Yea
 
 ### Chart behaviour
 
-- **Both** — single chart with all three series overlaid (Current Trends, NDC Commitments, Historical)
-- **Current Trends / NDC Commitments** — single chart for the selected scenario + historical reference
-- Both scenarios always share the same y-axis scale for direct comparison
+- One chart with a series per **selected** scenario overlaid (plus Historical) — toggling switches on/off adds or removes traces live
+- All selected scenarios always share the same y-axis scale for direct comparison
 - Hover over any point or bar to see the exact value (2 decimal places)
 - Dashed vertical line at 2020 marks the calibration / projection boundary (line chart only, Calibration & Projections mode)
 
@@ -218,8 +242,7 @@ When **Bar chart** is selected, bars are grouped by year with the same colour sc
 
 | Series | Fill | Border |
 |--------|------|--------|
-| Current Trends | Blue `#1565C0` | Black |
-| NDC Commitments | Green `#009C3B` | Black |
+| Each scenario | Assigned from the palette, in `scenarios.csv` order (1st = Blue `#1565C0`, 2nd = Green `#009C3B`, …) | Black |
 | Historical | Near-black `#1a1a1a` | Black |
 
 ### Data tables (right panel)
@@ -247,8 +270,7 @@ Values in the **Relative Difference** table are colour-coded by magnitude:
 
 | Series | Colour |
 |--------|--------|
-| Current Trends | Blue `#1565C0` |
-| NDC Commitments | Green `#009C3B` |
+| Each scenario | Assigned from the palette, in `scenarios.csv` order (1st = Blue `#1565C0`, 2nd = Green `#009C3B`, 3rd = Orange `#E65100`, …) |
 | Historical | Black `#000000` |
 
 ## 🌾 Shiny app — Crops tab
@@ -257,9 +279,9 @@ Values in the **Relative Difference** table are colour-coded by magnitude:
 |---------|---------|
 | **Crop** | Soybeans · Corn · Sugarcane |
 | **Type** | Area · Production · Yield |
-| **Scenario** | Both · Current Trends · NDC Commitments |
-| **Years** | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
-| **Chart type** | Line chart · Bar chart |
+| **Scenario** | One switch per scenario in `scenarios.csv`; any number on at once |
+| **Years** | "Calibration Only" switch — off = 2000–2050, on = 2000–2020 |
+| **Chart type** | Icon dropdown — Line chart · Bar chart · Area chart |
 
 ### Metrics
 
@@ -276,9 +298,9 @@ Historical reference comes from `histdatabrazil.csv` (IBGE). Layout, chart behav
 | Control | Options |
 |---------|---------|
 | **Emission** | CO2 AFOLU · CH4 Enteric Fermentation · CH4 Rice · N2O from Agriculture |
-| **Scenario** | Both · Current Trends · NDC Commitments |
-| **Years** | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
-| **Chart type** | Line chart · Bar chart |
+| **Scenario** | One switch per scenario in `scenarios.csv`; any number on at once |
+| **Years** | "Calibration Only" switch — off = 2000–2050, on = 2000–2020 |
+| **Chart type** | Icon dropdown — Line chart · Bar chart · Area chart |
 
 All values are in **MtCO2e**. Historical data from SEEG v13 is reported in million tonnes of the respective gas and converted to CO2e using IPCC AR6 GWP100 factors. FABLE Calculator columns are already in MtCO2e.
 
@@ -317,9 +339,9 @@ CO2 AFOLU values can go negative (net carbon sink). When they do, the y-axis ext
 | Control | Options |
 |---------|---------|
 | **Product** | Beef · Milk · Chicken · Pork |
-| **Scenario** | Both · Current Trends · NDC Commitments |
-| **Years** | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
-| **Chart type** | Line chart · Bar chart |
+| **Scenario** | One switch per scenario in `scenarios.csv`; any number on at once |
+| **Years** | "Calibration Only" switch — off = 2000–2050, on = 2000–2020 |
+| **Chart type** | Icon dropdown — Line chart · Bar chart · Area chart |
 
 All values are in **Mt** (million tonnes). Source: `ProdQ_feas` column from the FABLE crop table, converted from 1 000 t.
 
@@ -340,9 +362,9 @@ Only **Beef** has a historical series (Ruminant Meat, FAOSTAT). For Milk, Chicke
 |---------|---------|
 | **Type** | Exports · Imports |
 | **Product** | Depends on Type (see below) |
-| **Scenario** | Both · Current Trends · NDC Commitments |
-| **Years** | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
-| **Chart type** | Line chart · Bar chart |
+| **Scenario** | One switch per scenario in `scenarios.csv`; any number on at once |
+| **Years** | "Calibration Only" switch — off = 2000–2050, on = 2000–2020 |
+| **Chart type** | Icon dropdown — Line chart · Bar chart · Area chart |
 
 The Product selector updates automatically when Type changes. All values are in **Mt** (million tonnes), converted from the `Export_quantity` / `Import_quantity` columns in the FABLE crop table (1 000 t).
 
@@ -372,6 +394,8 @@ In addition to production (Mt) for Beef, Milk, Chicken and Pork, the Livestock t
 Neither variable has a historical series — the chart shows scenario lines only with no difference tables.
 
 ## 🌎 Shiny app — Maps tab
+
+> ⚠️ **Still hardcoded to the original Current Trends / NDC Commitments pair — not yet updated for the `scenarios.csv`-driven multi-scenario setup used by the other 6 tabs (Land Use, Emissions, Crops, Livestock, Trade, Food).** Adding UP48 (or any other scenario) has no effect here; this tab keeps showing the same `ct`/`ndc` pair regardless of what's active elsewhere. Bringing it in line — reading scenarios from `scenarios.csv`, generalizing the "Difference" column beyond a single pair — is planned for a near-term follow-up, not done in this pass.
 
 Displays static PNG maps generated from the FABLE downscaling model for both scenarios side by side.
 
@@ -413,9 +437,9 @@ Rscript 04_generate_maps.R diff     # difference maps only (fastest)
 | Control | Options |
 |---------|---------|
 | **Variable** | Food Consumption |
-| **Scenario** | Both · Current Trends · NDC Commitments |
-| **Years** | Calibration & Projections (2000–2050) · Calibration (2000–2020) |
-| **Chart type** | Line chart · Bar chart |
+| **Scenario** | One switch per scenario in `scenarios.csv`; any number on at once |
+| **Years** | "Calibration Only" switch — off = 2000–2050, on = 2000–2020 |
+| **Chart type** | Icon dropdown — Line chart · Bar chart · Area chart |
 
 Values are in **kcal/cap/day**. Source: `kcal_feas` column from the aggregate SCENATHON_report table. No historical data — the chart shows scenario lines only and the right panel shows a values table rounded to whole numbers.
 

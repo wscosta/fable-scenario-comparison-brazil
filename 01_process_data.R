@@ -2,9 +2,18 @@ library(readxl)
 library(dplyr)
 library(tidyr)
 
-path_ct   <- "data/xlsx/FABLECalculator_BRA_UP50_CurrentTrends.xlsx"
-path_ndc  <- "data/xlsx/FABLECalculator_BRA_UP50_NDC.xlsx"
 path_hist <- "data/csv/histdatabrazil.csv"
+
+# ── Scenario metadata ──────────────────────────────────────────────────────────
+# data/xlsx/scenarios.csv drives which xlsx files are read and what they're
+# labelled — add a row (+ drop the xlsx in data/xlsx/) to add a scenario,
+# no code changes needed.
+scenario_meta <- read.csv("data/xlsx/scenarios.csv", stringsAsFactors = FALSE)
+if (nrow(scenario_meta) == 0) stop("data/xlsx/scenarios.csv has no rows")
+scenario_meta$path <- file.path("data/xlsx", scenario_meta$file)
+missing_xlsx <- scenario_meta$path[!file.exists(scenario_meta$path)]
+if (length(missing_xlsx) > 0)
+  stop("Missing xlsx file(s) listed in scenarios.csv: ", paste(missing_xlsx, collapse = ", "))
 
 # ── Read SCENATHON_report ─────────────────────────────────────────────────────
 # Row 10 = units; row 11 = column headers; data rows start at row 12.
@@ -32,14 +41,11 @@ read_scenathon <- function(path, scenario_label) {
     mutate(scenario = scenario_label)
 }
 
-df_ct  <- read_scenathon(path_ct,  "Current Trends")
-df_ndc <- read_scenathon(path_ndc, "NDC Commitments")
+df_scenarios <- bind_rows(Map(read_scenathon, scenario_meta$path, scenario_meta$label))
 
 # Print all column names once (helpful for mapping variables)
 message("── SCENATHON_report columns ──────────────────────────────────")
-print(names(df_ct))
-
-df_scenarios <- bind_rows(df_ct, df_ndc)
+print(names(df_scenarios))
 
 # ── Read crop table (second table in SCENATHON_report, header at row 29) ──────
 # Columns used: B=Product, C=Year, G=ProdQ_feas, H=FeasHarvarea
@@ -58,10 +64,7 @@ read_crop_table <- function(path, scenario_label) {
     select(scenario, Product, Year, ProdQ_feas, FeasHarvarea, Export_quantity, Import_quantity)
 }
 
-df_crops <- bind_rows(
-  read_crop_table(path_ct,  "Current Trends"),
-  read_crop_table(path_ndc, "NDC Commitments")
-)
+df_crops <- bind_rows(Map(read_crop_table, scenario_meta$path, scenario_meta$label))
 
 message("── Crop products found ───────────────────────────────────────")
 print(sort(unique(df_crops$Product)))
@@ -92,10 +95,7 @@ read_livestock_table <- function(path, scenario_label) {
     )
 }
 
-df_livestock <- bind_rows(
-  read_livestock_table(path_ct,  "Current Trends"),
-  read_livestock_table(path_ndc, "NDC Commitments")
-)
+df_livestock <- bind_rows(Map(read_livestock_table, scenario_meta$path, scenario_meta$label))
 
 # ── Read historical data ──────────────────────────────────────────────────────
 df_hist <- read.csv(path_hist, check.names = FALSE, stringsAsFactors = FALSE)
@@ -104,8 +104,8 @@ df_hist <- df_hist %>%
   mutate(year  = as.integer(trimws(as.character(year))),
          value = as.numeric(value))
 
-# ── Read units (row 10, same structure in both files) ─────────────────────────
-fable_units <- read_units(path_ct)
+# ── Read units (row 10, same structure in all files) ──────────────────────────
+fable_units <- read_units(scenario_meta$path[1])
 
 # ── Save ──────────────────────────────────────────────────────────────────────
 dir.create("data/processed", showWarnings = FALSE, recursive = TRUE)
