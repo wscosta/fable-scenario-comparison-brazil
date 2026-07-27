@@ -1,7 +1,9 @@
 library(shiny)
 suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(tidyr))
 suppressPackageStartupMessages(library(plotly))
 suppressPackageStartupMessages(library(bslib))
+suppressPackageStartupMessages(library(chorddiag))
 
 # Run 01_process_data.R if any processed file is missing, or if the scenario
 # set on disk (data/xlsx/scenarios.csv) no longer matches what's cached.
@@ -9,18 +11,22 @@ needs_reprocess <- function() {
   if (!file.exists("data/processed/df_scenarios.rds") ||
       !file.exists("data/processed/fable_units.rds")  ||
       !file.exists("data/processed/df_crops.rds")     ||
-      !file.exists("data/processed/df_livestock.rds")) return(TRUE)
+      !file.exists("data/processed/df_livestock.rds") ||
+      !file.exists("data/processed/df_luc_matrix.rds") ||
+      !file.exists("data/processed/df_luc_stock.rds")) return(TRUE)
   cached  <- sort(unique(readRDS("data/processed/df_scenarios.rds")$scenario))
   current <- sort(read.csv("data/xlsx/scenarios.csv", stringsAsFactors = FALSE)$label)
   !identical(cached, current)
 }
 if (needs_reprocess()) source("01_process_data.R")
 
-df_scenarios <- readRDS("data/processed/df_scenarios.rds")
-df_hist      <- readRDS("data/processed/df_hist.rds")
-fable_units  <- readRDS("data/processed/fable_units.rds")
-df_crops     <- readRDS("data/processed/df_crops.rds")
-df_livestock <- readRDS("data/processed/df_livestock.rds")
+df_scenarios  <- readRDS("data/processed/df_scenarios.rds")
+df_hist       <- readRDS("data/processed/df_hist.rds")
+fable_units   <- readRDS("data/processed/fable_units.rds")
+df_crops      <- readRDS("data/processed/df_crops.rds")
+df_livestock  <- readRDS("data/processed/df_livestock.rds")
+df_luc_matrix <- readRDS("data/processed/df_luc_matrix.rds")
+df_luc_stock  <- readRDS("data/processed/df_luc_stock.rds")
 
 # ── Scenario discovery, order, and colors ─────────────────────────────────────
 # data/xlsx/scenarios.csv is the single source of truth for which scenarios
@@ -76,26 +82,33 @@ get_selected_scenarios_r <- function(input, prefix, scenarios = available_scenar
 CHART_TYPE_CHOICES <- c("Line chart", "Bar chart", "Area chart")
 CHART_TYPE_ICONS   <- c("Line chart" = "chart-line", "Bar chart" = "chart-column", "Area chart" = "chart-area")
 
-chart_type_ui <- function(input_id, default = "Line chart", label = "Chart type") {
+# choices/icons default to the Line/Bar/Area picker used by the 6 main tabs;
+# passing a different pair (e.g. LUC_DIAGRAM_CHOICES/ICONS) reuses the exact
+# same icon-dropdown widget for a different picker (Land Use Change's
+# Chord/Sankey/Stacked Bar) — the shiny:connected JS handler queries
+# `.chart-type-dropdown` generically by class/data-attributes, so it needs no
+# changes to support a second instance with different choices.
+chart_type_ui <- function(input_id, default = "Line chart", label = "Chart type",
+                          choices = CHART_TYPE_CHOICES, icons = CHART_TYPE_ICONS) {
   div(class = "chart-type-dropdown dropdown", `data-chart-id` = input_id,
       tags$button(
         class = "btn btn-outline-secondary btn-sm dropdown-toggle chart-type-toggle",
         type = "button", `data-bs-toggle` = "dropdown", `aria-expanded` = "false",
         title = label,
-        tags$i(class = paste0("fas fa-", CHART_TYPE_ICONS[[default]]))
+        tags$i(class = paste0("fas fa-", icons[[default]]))
       ),
       tags$ul(class = "dropdown-menu",
-        lapply(CHART_TYPE_CHOICES, function(choice) {
+        lapply(choices, function(choice) {
           tags$li(tags$a(
             href = "#",
             class = paste("dropdown-item chart-type-item", if (choice == default) "active"),
-            `data-value` = choice, `data-icon` = CHART_TYPE_ICONS[[choice]],
-            tags$i(class = paste0("fas fa-", CHART_TYPE_ICONS[[choice]])), " ", choice
+            `data-value` = choice, `data-icon` = icons[[choice]],
+            tags$i(class = paste0("fas fa-", icons[[choice]])), " ", choice
           ))
         })
       ),
       div(class = "chart-type-hidden-radio",
-          radioButtons(input_id, label, choices = CHART_TYPE_CHOICES, selected = default))
+          radioButtons(input_id, label, choices = choices, selected = default))
   )
 }
 
@@ -1007,6 +1020,361 @@ make_emiss_rel_diff_colored <- function(emiss_name, scenario_sel) {
   df
 }
 
+# ── Land Use Change tab (Chord / Sankey / Stacked Bar) ────────────────────────
+# Mirrors the sister MAgPIE app's Land Use Change tab (same diagram types,
+# styling, JS/CSS fixes), but the underlying data is simpler here: both source
+# tables (df_luc_matrix, df_luc_stock — see 01_process_data.R) already use
+# column/value names matching the class names directly (ToForest, ToCropland,
+# ...), so no "LUC|{from}|{to}" string-key matching is needed the way MAgPIE's
+# long report.rds required.
+#
+# 6 classes (no Primary/Secondary Forest split here, unlike MAgPIE) —
+# NewForest plays the role MAgPIE's Planted Forest did (a class that's 0 in
+# some scenarios, active in others — confirmed empirically: 0 throughout in
+# UP50 Current Trends, grows to 12,000 x 1000 ha by 2030 in UP50 NDC).
+LUC_CLASSES       <- c("Forest", "Cropland", "Pasture", "OtherLand", "Urban", "NewForest")
+LUC_CHORD_CLASSES <- c("Forest", "NewForest", "Cropland", "Pasture", "OtherLand", "Urban")
+LUC_BAR_CLASSES   <- LUC_CLASSES
+
+# One representative colour per class — reused directly from MAgPIE's palette
+# for the equivalent role (forest = darkest green, NewForest/Planted Forest =
+# light green, Cropland = egg-yolk yellow, Pasture = blue-leaning purple,
+# Other Land = brownish, Urban = grey).
+LUC_CLASS_COLORS <- c(
+  "Forest"    = "#1B5E20",
+  "NewForest" = "#A5D6A7",
+  "Cropland"  = "#F4B400",
+  "Pasture"   = "#5E35B1",
+  "OtherLand" = "#8D6E63",
+  "Urban"     = "#757575"
+)
+
+# Display labels for the Chord diagram's group names — internal class names
+# (`OtherLand`, `NewForest`) stay unspaced everywhere else (column lookups,
+# match()/dimnames keys), only the on-screen Chord labels get a space.
+LUC_CLASS_LABELS <- c(
+  "Forest"    = "Forest",
+  "NewForest" = "New Forest",
+  "Cropland"  = "Cropland",
+  "Pasture"   = "Pasture",
+  "OtherLand" = "Other Land",
+  "Urban"     = "Urban"
+)
+
+LUC_DIAGRAM_CHOICES <- c("Chord", "Sankey", "Stacked Bar")
+LUC_DIAGRAM_ICONS   <- c("Sankey" = "water", "Chord" = "circle-nodes", "Stacked Bar" = "chart-column")
+
+# Sums the from->to flows over the periods between start_year and end_year
+# (periods fully inside the window: YearStart >= start_year & YearEnd <=
+# end_year) and converts 1000 ha -> Mha. Also adds one "stayed as X" row per
+# class (from == to) so node/arc widths reflect each class's full start_year
+# stock, not just the area that actually converted — persistence =
+# AreaStart(X, start_year) - total outflow from X over the window, floored at
+# 0. AreaStart is already keyed by (class, YearStart) in df_luc_matrix, so no
+# separate stock lookup is needed here (simpler than MAgPIE, which had to
+# cross-reference a different variable family for stock).
+get_luc_flows <- function(scen, classes = LUC_CLASSES, start_year = 2020, end_year = 2050,
+                          include_persistence = TRUE) {
+  if (end_year <= start_year)
+    return(data.frame(from = character(0), to = character(0), value = numeric(0)))
+
+  sub <- df_luc_matrix %>%
+    filter(scenario == scen, LandCoverInit %in% classes,
+           YearStart >= start_year, YearEnd <= end_year)
+
+  to_cols <- paste0("To", classes)
+  long <- sub %>%
+    select(from = LandCoverInit, all_of(to_cols)) %>%
+    pivot_longer(all_of(to_cols), names_to = "to", values_to = "value") %>%
+    mutate(to = sub("^To", "", to), value = value / 1000) %>%
+    group_by(from, to) %>%
+    summarise(value = sum(value, na.rm = TRUE), .groups = "drop") %>%
+    filter(from != to, value > 1e-4)
+
+  if (include_persistence) {
+    stock <- df_luc_matrix %>%
+      filter(scenario == scen, LandCoverInit %in% classes, YearStart == start_year) %>%
+      transmute(class = LandCoverInit, area_start = AreaStart / 1000)
+    outflow <- long %>% group_by(from) %>% summarise(total = sum(value), .groups = "drop")
+    pers <- stock %>%
+      left_join(outflow, by = c("class" = "from")) %>%
+      mutate(total = coalesce(total, 0), value = pmax(area_start - total, 0)) %>%
+      filter(value > 1e-4) %>%
+      transmute(from = class, to = class, value)
+    long <- bind_rows(long, pers)
+  }
+
+  as.data.frame(long)
+}
+
+# Plain-text title shared by Sankey and Chord (chorddiag has no title concept
+# of its own — see make_luc_server's renderUI grid for the plain <div> that
+# draws this above a Chord widget instead).
+luc_title_text <- function(scen, start_year = 2020, end_year = 2050)
+  paste0(start_year, " → ", end_year, " | ", scen)
+
+make_luc_sankey <- function(scen, classes = LUC_CLASSES, start_year = 2020, end_year = 2050) {
+  flows <- get_luc_flows(scen, classes, start_year, end_year)
+  title_txt  <- paste0("<b>", luc_title_text(scen, start_year, end_year), "</b>")
+  title_font <- list(color = "black", size = 15)
+
+  if (nrow(flows) == 0) {
+    msg <- if (end_year <= start_year) "End year must be after start year"
+           else "No land-use transitions in this window"
+    return(plot_ly() %>%
+      layout(title = list(text = title_txt, font = title_font),
+             xaxis = list(visible = FALSE), yaxis = list(visible = FALSE),
+             annotations = list(text = msg, showarrow = FALSE, font = list(size = 13))))
+  }
+
+  n <- length(classes)
+  # plotly's Sankey trace has a rendering bug when explicit node x/y positions
+  # are supplied (with or without arrangement = "fixed"): the right-side node
+  # whose left-side counterpart sits at 0-based array index 0 gets rendered at
+  # the wrong x (the left column's offset instead of its own) — reproduced and
+  # confirmed via direct SVG <g class="node"> transform inspection. Confirmed
+  # index-0-specific, not tied to any one class (reordering `classes` moved
+  # the bug to whichever class then sat at position 0) and not tied to
+  # arrangement = "fixed" specifically (removing just that string, keeping
+  # x/y, reproduced the bug identically). A dummy-node-at-index-0 workaround
+  # was also tried and did NOT fix it (bug just moved to the new index 0).
+  # The only fix that worked: omit x/y entirely and let plotly's default
+  # "snap" arrangement auto-layout the nodes. Trade-off: node vertical order
+  # is no longer pinned to `classes`' order and may differ slightly across
+  # scenario panels, since "snap" optimizes each panel's layout independently.
+  plot_ly(
+    type = "sankey", orientation = "h",
+    node = list(
+      label = c(classes, classes),
+      color = unname(LUC_CLASS_COLORS[c(classes, classes)]),
+      pad = 12, thickness = 16,
+      line = list(color = "white", width = 0.5)
+    ),
+    link = list(
+      source = match(flows$from, classes) - 1,
+      target = match(flows$to,   classes) - 1 + n,
+      value  = flows$value,
+      color = mapply(function(from, to) {
+        hex_to_rgba(unname(LUC_CLASS_COLORS[from]), 0.45)
+      }, flows$from, flows$to),
+      hovertemplate = "%{source.label} → %{target.label}: %{value:.2f} Mha<extra></extra>"
+    )
+  ) %>%
+    layout(title = list(text = title_txt, font = title_font, y = 0.95, yanchor = "top"),
+           font = list(size = 11),
+           margin = list(t = 45, b = 10, l = 10, r = 10))
+}
+
+# Square from/to matrix for chorddiag — same flows get_luc_flows already
+# returns (including the "stayed as X" diagonal), reshaped into a plain
+# numeric matrix: row i -> column j.
+luc_flow_matrix <- function(scen, classes = LUC_CLASSES, start_year = 2020, end_year = 2050) {
+  flows <- get_luc_flows(scen, classes, start_year, end_year)
+  n <- length(classes)
+  m <- matrix(0, n, n, dimnames = list(classes, classes))
+  if (nrow(flows) > 0)
+    m[cbind(match(flows$from, classes), match(flows$to, classes))] <- flows$value
+  m
+}
+
+# type = "directional" is chorddiag's own support for an asymmetric matrix
+# (row -> column flows, tapered/coloured by source). Label line-wrap + keeping
+# every label horizontal (rather than tangent-to-the-arc, chorddiag's default)
+# is handled globally by a MutationObserver in tags$head() — see that
+# comment (wrapChordLabel) for why a JS-side observer was needed instead of
+# htmlwidgets::onRender(). classes defaults to LUC_CHORD_CLASSES (its own
+# circular order, NewForest next to Forest) rather than LUC_CLASSES.
+make_luc_chord <- function(scen, classes = LUC_CHORD_CLASSES, start_year = 2020, end_year = 2050) {
+  m <- luc_flow_matrix(scen, classes, start_year, end_year)
+  chorddiag(m, type = "directional",
+           groupNames = unname(LUC_CLASS_LABELS[classes]), groupColors = unname(LUC_CLASS_COLORS[classes]),
+           groupnamePadding = 50, groupnameFontsize = 11,
+           tooltipUnit = " Mha", precision = 1, margin = 100)
+}
+
+# Fixed periods: the Stacked Bar always shows the full trajectory, no
+# start/end window to pick. Unlike MAgPIE (whose cumulative-since-1995
+# series needs a diff() and so has a bar for 2000 vs. the 1995 baseline),
+# df_luc_stock has no year before 2000 to diff against, so the first bar here
+# is 2005 (change vs. 2000), not 2000 — an intentional structural difference,
+# not a bug.
+LUC_NET_CHANGE_PERIODS <- seq(2005, 2050, by = 5)
+
+get_luc_net_change <- function(scen, classes = LUC_CLASSES, periods = LUC_NET_CHANGE_PERIODS) {
+  sub <- df_luc_stock %>% filter(scenario == scen, class %in% classes, year %in% c(periods[1] - 5, periods))
+  do.call(rbind, lapply(classes, function(cl) {
+    d <- sub[sub$class == cl, ]
+    d <- d[order(d$year), ]
+    if (nrow(d) < 2) return(data.frame(class = cl, year = periods, value_mha = 0))
+    data.frame(class = cl, year = d$year[-1], value_mha = diff(d$area) / 1000)
+  }))
+}
+
+# Shared y-axis range across every currently-shown scenario's Stacked Bar,
+# always on (not an optional toggle) — sum just the positive-valued classes
+# (top of that bar's stack) and just the negative ones (bottom) per
+# scenario/period; the overall max positive sum and min negative sum across
+# every scenario/period become one fixed [min, max] range, so bar heights are
+# directly comparable across scenarios.
+calc_luc_bar_y_range_shared <- function(scenarios, classes = LUC_BAR_CLASSES, periods = LUC_NET_CHANGE_PERIODS) {
+  stacks <- unlist(lapply(scenarios, function(s) {
+    df <- get_luc_net_change(s, classes, periods)
+    sapply(periods, function(yr) sum(df$value_mha[df$year == yr & df$value_mha > 0]))
+  }))
+  neg_stacks <- unlist(lapply(scenarios, function(s) {
+    df <- get_luc_net_change(s, classes, periods)
+    sapply(periods, function(yr) sum(df$value_mha[df$year == yr & df$value_mha < 0]))
+  }))
+  pos_max <- if (length(stacks) == 0) 1 else max(stacks, 0)
+  neg_min <- if (length(neg_stacks) == 0) 0 else min(neg_stacks, 0)
+  pad <- max(pos_max - neg_min, 1) * 0.05
+  c(neg_min - pad, pos_max + pad)
+}
+
+# Diverging stacked bar: barmode = "relative" stacks positive segments above
+# zero and negative ones below it. Zero line drawn as a bold black dotted
+# `shapes` line (more prominent than plotly's default faint zeroline) to make
+# gains vs losses unambiguous. showlegend = FALSE — the per-class legend is
+# shown once, shared above the whole grid (make_luc_class_legend_html()).
+make_luc_stackedbar <- function(scen, classes = LUC_BAR_CLASSES, periods = LUC_NET_CHANGE_PERIODS,
+                                y_range = NULL) {
+  df <- get_luc_net_change(scen, classes, periods)
+
+  p <- plot_ly()
+  for (cl in classes) {
+    d <- df[df$class == cl, ]
+    p <- add_trace(p, data = d, x = ~year, y = ~value_mha, type = "bar", name = cl,
+                   marker = list(color = LUC_CLASS_COLORS[[cl]], line = list(color = "black", width = 1)),
+                   hovertemplate = paste0(cl, ": %{y:.2f} Mha<extra></extra>"))
+  }
+  p %>% layout(
+    barmode = "relative", showlegend = FALSE,
+    title  = list(text = paste0("<b>", scen, "</b>"), font = list(color = "black", size = 15)),
+    xaxis  = list(title = "", tickvals = periods,
+                  ticks = "outside", ticklen = 6, tickcolor = "white", gridcolor = "#CCCCCC"),
+    yaxis  = list(title = "Change vs. previous period (Mha)", tickformat = ".1f", range = y_range,
+                  ticks = "outside", ticklen = 6, tickcolor = "white", gridcolor = "#CCCCCC"),
+    shapes = list(
+      list(type = "line", xref = "paper", yref = "y", x0 = 0, x1 = 1, y0 = 0, y1 = 0,
+           line = list(color = "black", dash = "dot", width = 2)),
+      list(type = "rect", xref = "paper", yref = "paper", x0 = 0, x1 = 1, y0 = 0, y1 = 1,
+           line = list(color = "black", width = 1), fillcolor = "rgba(0,0,0,0)")
+    ),
+    margin = list(l = 70, r = 20, t = 50, b = 50),
+    plot_bgcolor = "white", paper_bgcolor = "white"
+  )
+}
+
+# Shared class-colour legend for the Stacked Bar diagram, shown once above
+# the whole grid instead of repeating it on every scenario's panel.
+make_luc_class_legend_html <- function(classes = LUC_BAR_CLASSES) {
+  items <- lapply(classes, function(cl) {
+    col <- LUC_CLASS_COLORS[[cl]]
+    tags$span(
+      style = "display:inline-flex; align-items:center; gap:5px; margin:0 14px;",
+      tags$span(style = sprintf(
+        "display:inline-block; width:12px; height:12px; background:%s; border:1px solid black; border-radius:2px;",
+        col)),
+      tags$span(cl, style = "font-size:12px;")
+    )
+  })
+  div(style = paste("display:flex; justify-content:center; flex-wrap:wrap;",
+                    "padding:6px; border:1px solid black; border-radius:4px;",
+                    "background:white; margin-bottom:8px;"),
+      items)
+}
+
+luc_sidebar_ui <- function() {
+  tagList(
+    scenario_switches_ui("luc"),
+    # Hidden for Stacked Bar — that chart always shows the full trajectory
+    # (see make_luc_stackedbar), so a start/end window has no meaning there.
+    conditionalPanel(
+      condition = "input.luc_diagram != 'Stacked Bar'",
+      sliderInput("luc_years", "Period", min = 2000, max = 2050, step = 5,
+                 value = c(2020, 2050), sep = "", ticks = FALSE),
+      div(style = "position:relative; height:14px; margin-top:-6px; font-size:11px; color:#666;",
+          span("2000", style = "position:absolute; left:0;"),
+          span("2020", style = "position:absolute; left:40%; transform:translateX(-50%);"),
+          span("2050", style = "position:absolute; right:0;")
+      )
+    ),
+    chart_type_ui("luc_diagram", choices = LUC_DIAGRAM_CHOICES, icons = LUC_DIAGRAM_ICONS,
+                  default = "Chord", label = "Diagram type")
+  )
+}
+
+# One Sankey/Chord/Stacked Bar per selected scenario, side by side — same
+# "toggle a scenario, see its own chart appear" idea as elsewhere in the app.
+# Render functions are pre-registered once per available_scenarios (not
+# inside the dynamic UI) — only the currently-selected ones get a placeholder
+# in the DOM to bind to.
+make_luc_server <- function(input, output, session) {
+  luc_scen_sel <- reactive(get_selected_scenarios_r(input, "luc"))
+
+  bar_y_range_r <- reactive({
+    req(length(luc_scen_sel()) > 0)
+    calc_luc_bar_y_range_shared(luc_scen_sel())
+  })
+
+  output$luc_grid <- renderUI({
+    req(length(luc_scen_sel()) > 0)
+    scens   <- luc_scen_sel()
+    ncol    <- min(length(scens), 3)
+    w       <- floor(12 / ncol)
+    diagram <- input$luc_diagram %||% "Chord"
+    yrs     <- input$luc_years %||% c(2020, 2050)
+
+    # chorddiagOutput/plotlyOutput default to a small fixed height, which
+    # bottlenecks the diagram into a small circle/chart even inside a much
+    # wider column — height tiered by ncol as a stand-in for "how wide is
+    # this column actually going to be" (fewer scenarios -> wider columns ->
+    # a bigger height cap makes sense).
+    panel_h <- if (ncol == 1) "760px" else if (ncol == 2) "620px" else "480px"
+
+    grid <- fluidRow(lapply(scens, function(s) {
+      sid <- make.names(s)
+      widget <- if (diagram == "Chord") {
+        tagList(
+          div(luc_title_text(s, yrs[1], yrs[2]),
+              style = "font-weight:bold; color:black; font-size:15px; text-align:center; margin-bottom:4px;"),
+          chorddiagOutput(paste0("luc_chord_", sid), width = "100%", height = panel_h)
+        )
+      } else if (diagram == "Stacked Bar") {
+        plotlyOutput(paste0("luc_bar_", sid), width = "100%", height = panel_h)
+      } else {
+        plotlyOutput(paste0("luc_plot_", sid), height = "420px")
+      }
+      column(width = w, div(class = "luc-frame", style = "flex-direction:column;", widget))
+    }))
+
+    if (diagram == "Stacked Bar") tagList(make_luc_class_legend_html(), grid) else grid
+  })
+
+  for (s in available_scenarios) {
+    local({
+      scen <- s
+      sid  <- make.names(scen)
+      on_r <- reactive(isTRUE(input[[paste0("luc_scen_", sid)]]))
+
+      output[[paste0("luc_plot_", sid)]] <- renderPlotly({
+        req(on_r(), input$luc_years)
+        make_luc_sankey(scen, start_year = input$luc_years[1], end_year = input$luc_years[2])
+      })
+
+      output[[paste0("luc_chord_", sid)]] <- renderChorddiag({
+        req(on_r(), input$luc_years)
+        make_luc_chord(scen, start_year = input$luc_years[1], end_year = input$luc_years[2])
+      })
+
+      output[[paste0("luc_bar_", sid)]] <- renderPlotly({
+        req(on_r())
+        make_luc_stackedbar(scen, y_range = bar_y_range_r())
+      })
+    })
+  }
+}
+
 # ── Static assets ─────────────────────────────────────────────────────────────
 addResourcePath("images", normalizePath("data/images", mustWork = FALSE))
 addResourcePath("maps",   normalizePath("data/maps",   mustWork = FALSE))
@@ -1158,6 +1526,15 @@ ui <- page_navbar(
         background-color: #007B8A; color: white;
       }
       .chart-type-dropdown .dropdown-item i { width: 16px; text-align: center; margin-right: 4px; }
+      /* Land Use Change tab: each scenario's diagram sits in its own box, but
+         an invisible one on purpose — no border/background, just containment
+         (a chart can't visually bleed into its neighbour when the grid
+         rebuilds on every scenario toggle). Flex centering keeps the diagram
+         (and, for Chord, its title div) centered in the box by default. */
+      .luc-frame {
+        position: relative; overflow: hidden;
+        display: flex; align-items: center; justify-content: center;
+      }
     ")),
     tags$script(HTML("
       // Icon-only Chart type dropdown (chart_type_ui()) — the real Shiny
@@ -1182,6 +1559,65 @@ ui <- page_navbar(
             });
           });
         });
+
+        // Land Use Change tab — Chord diagrams: chorddiag draws each group
+        // name as a single-line SVG text element with no wrap support at all
+        // (see its own chorddiag.js — plain .text(d.label)), so a long name
+        // like 'OtherLand' can crowd its neighbour on a small arc. A
+        // MutationObserver reacts to the actual DOM change (a fresh
+        // single-line text element appearing under g.names) instead of a
+        // render-lifecycle hook — chorddiag's own resize() method (fired on
+        // every container-size change, e.g. toggling a scenario) rebuilds
+        // the SVG directly, bypassing htmlwidgets' render-complete dispatch
+        // that a onRender() hook would depend on. Idempotent (skips a
+        // <text> that already has a tspan child) so it can't double-wrap or
+        // loop on its own mutations.
+        // De-rotation: chorddiag positions each label's parent <g> with
+        // rotate(angle-90) translate(r, 0) — a polar-coordinates trick that
+        // also rotates the label text to follow the arc tangentially. We
+        // want the SAME position but no rotation, so the label stays upright
+        // and readable everywhere on the circle: read r back out of the
+        // existing transform, recompute the equivalent Cartesian (x, y) from
+        // the datum's own angle, and replace the transform with a plain
+        // translate — no rotate. Guarded by data-derotated so re-running
+        // this (the observer fires on every fresh render) doesn't re-derive
+        // from an already-rewritten transform.
+        function wrapChordLabel(textEl) {
+          var g = textEl.parentNode;
+          if (g && !g.getAttribute('data-derotated')) {
+            var datum = d3.select(g).datum();
+            var m = /translate\\(\\s*([-\\d.]+)/.exec(g.getAttribute('transform') || '');
+            if (datum && m) {
+              var r   = parseFloat(m[1]);
+              var phi = datum.angle - Math.PI / 2;
+              g.setAttribute('transform', 'translate(' + (r * Math.cos(phi)) + ',' + (r * Math.sin(phi)) + ')');
+              g.setAttribute('data-derotated', '1');
+            }
+            d3.select(textEl).attr('transform', null);
+          }
+          var text = d3.select(textEl);
+          if (!text.select('tspan').empty()) return;
+          var words = text.text().split(' ');
+          if (words.length < 2) return;
+          var bestI = 1, bestDiff = Infinity;
+          for (var i = 1; i < words.length; i++) {
+            var diff = Math.abs(words.slice(0, i).join(' ').length - words.slice(i).join(' ').length);
+            if (diff < bestDiff) { bestDiff = diff; bestI = i; }
+          }
+          text.text(null);
+          text.append('tspan').attr('x', 0).attr('dy', '-0.3em').text(words.slice(0, bestI).join(' '));
+          text.append('tspan').attr('x', 0).attr('dy', '1.1em').text(words.slice(bestI).join(' '));
+        }
+        new MutationObserver(function(mutations) {
+          mutations.forEach(function(m) {
+            m.addedNodes.forEach(function(node) {
+              if (node.nodeType !== 1) return;
+              if (node.matches && node.matches('g.names text')) wrapChordLabel(node);
+              if (node.querySelectorAll)
+                node.querySelectorAll('g.names text').forEach(wrapChordLabel);
+            });
+          });
+        }).observe(document.body, { childList: true, subtree: true });
       });
     "))
   ),
@@ -1202,6 +1638,13 @@ ui <- page_navbar(
         chart_type_ui("chart_type")
       ),
       uiOutput("charts_ui")
+    )
+  ),
+
+  nav_panel(HTML("&#x1F504; Land Use Change"),
+    layout_sidebar(
+      sidebar = sidebar(luc_sidebar_ui()),
+      uiOutput("luc_grid")
     )
   ),
 
@@ -1351,7 +1794,7 @@ server <- function(input, output, session) {
   # finished, so an unforced `s` parameter is still an unevaluated promise
   # pointing at the *loop variable itself*, which every call shares. Forcing
   # it up front freezes each call's own copy before the loop can move on.
-  SCENARIO_TAB_PREFIXES <- c("lu", "emiss", "crop", "live", "trade", "food")
+  SCENARIO_TAB_PREFIXES <- c("lu", "luc", "emiss", "crop", "live", "trade", "food")
   scenario_state <- reactiveValues()
   for (s in available_scenarios) scenario_state[[s]] <- s %in% default_scenarios
 
@@ -1929,6 +2372,8 @@ server <- function(input, output, session) {
       column(4, make_map_img("diff", type_sel, var_sel, year))
     )
   })
+
+  make_luc_server(input, output, session)
 }
 
 shinyApp(ui, server)

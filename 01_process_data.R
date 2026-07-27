@@ -97,6 +97,39 @@ read_livestock_table <- function(path, scenario_label) {
 
 df_livestock <- bind_rows(Map(read_livestock_table, scenario_meta$path, scenario_meta$label))
 
+# ── Read land transition matrix (4_calc_land sheet, calc_landmatrix table) ────
+# 60 rows = 6 source classes (LandCoverInit) x 10 five-year periods
+# (YearStart/YearEnd, 2000-2050). To{Class} columns are gross flow that period
+# (1000 ha/5 year); AreaStart/AreaEnd are stock (1000 ha) for that class/period.
+read_land_matrix <- function(path, scenario_label) {
+  raw <- read_excel(path, sheet = "4_calc_land", range = "BK31:BX91", col_names = TRUE)
+  raw %>%
+    mutate(scenario   = scenario_label,
+           YearStart  = as.integer(YearStart),
+           YearEnd    = as.integer(YearEnd))
+}
+
+df_luc_matrix <- bind_rows(Map(read_land_matrix, scenario_meta$path, scenario_meta$label))
+
+# ── Read land cover stock (LAND sheet, ResultsLand table) ─────────────────────
+# One row per year (2000-2050); stock (1000 ha) for the same 6 classes as
+# calc_landmatrix. Reshaped to long format (scenario, year, class, area) —
+# 02_shiny_app.R derives period-over-period change via diff() of `area`
+# rather than reading this sheet's own *Change columns (verified those are
+# exactly diff() of the stock columns; deriving it ourselves avoids an
+# inconsistent class->column-name mapping and gives NewForest the same
+# treatment as the other 5 classes, which the sheet's own columns don't).
+read_land_stock <- function(path, scenario_label) {
+  raw <- read_excel(path, sheet = "LAND", range = "K13:AK24", col_names = TRUE)
+  raw %>%
+    mutate(scenario = scenario_label, Year = as.integer(Year)) %>%
+    select(scenario, year = Year, Cropland, Pasture, Forest, OtherLand, Urban, NewForest) %>%
+    pivot_longer(c(Cropland, Pasture, Forest, OtherLand, Urban, NewForest),
+                 names_to = "class", values_to = "area")
+}
+
+df_luc_stock <- bind_rows(Map(read_land_stock, scenario_meta$path, scenario_meta$label))
+
 # ── Read historical data ──────────────────────────────────────────────────────
 df_hist <- read.csv(path_hist, check.names = FALSE, stringsAsFactors = FALSE)
 colnames(df_hist) <- trimws(colnames(df_hist))
@@ -114,5 +147,7 @@ saveRDS(df_hist,       "data/processed/df_hist.rds")
 saveRDS(fable_units,   "data/processed/fable_units.rds")
 saveRDS(df_crops,      "data/processed/df_crops.rds")
 saveRDS(df_livestock,  "data/processed/df_livestock.rds")
-message("Saved: df_scenarios.rds, df_hist.rds, fable_units.rds, df_crops.rds, df_livestock.rds")
+saveRDS(df_luc_matrix, "data/processed/df_luc_matrix.rds")
+saveRDS(df_luc_stock,  "data/processed/df_luc_stock.rds")
+message("Saved: df_scenarios.rds, df_hist.rds, fable_units.rds, df_crops.rds, df_livestock.rds, df_luc_matrix.rds, df_luc_stock.rds")
 

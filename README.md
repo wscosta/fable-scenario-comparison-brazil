@@ -29,6 +29,7 @@ R (≥ 4.1) with the following packages:
 | `shiny` | Web app framework |
 | `plotly` | Interactive charts |
 | `bslib` | Bootstrap 5 theming |
+| `chorddiag` | Chord diagram widget (Land Use Change tab) |
 | `terra` | Raster processing and map generation |
 | `RColorBrewer` | Colour palettes for maps |
 | `ggplot2` | Static charts (report only) |
@@ -41,6 +42,7 @@ Install all at once from the R console:
 install.packages(c("readxl", "dplyr", "tidyr", "shiny", "plotly", "bslib",
                    "terra", "RColorBrewer",
                    "ggplot2", "officer", "flextable"))
+remotes::install_github("mattflor/chorddiag")  # GitHub-only, not on CRAN
 ```
 
 ## ▶️ One-click launchers
@@ -85,7 +87,7 @@ FABLECalculator_BRA_UP48_NDC.xlsx,UP48 - NDC Commitments,48
 
 **Default-on scenarios:** the optional `up` column controls which switches start checked — only the rows with the *highest* `up` value default to on (currently the two UP50 rows); everything else starts off but is still selectable. Adding a new, higher-numbered UP row automatically becomes the new default the next time the app launches, no code changes needed. Omitting the `up` column entirely makes every scenario default to checked.
 
-**Switches stay in sync across tabs:** toggling a scenario on or off on any tab (Land Use, Emissions, Crops, Livestock, Trade, Food) applies the same change everywhere else — there's one shared selection, not six independent ones.
+**Switches stay in sync across tabs:** toggling a scenario on or off on any tab (Land Use, Land Use Change, Emissions, Crops, Livestock, Trade, Food) applies the same change everywhere else — there's one shared selection, not seven independent ones.
 
 ## 📁 Repository structure
 
@@ -273,6 +275,46 @@ Values in the **Relative Difference** table are colour-coded by magnitude:
 | Each scenario | Assigned from the palette, in `scenarios.csv` order (1st = Blue `#1565C0`, 2nd = Green `#009C3B`, 3rd = Orange `#E65100`, …) |
 | Historical | Black `#000000` |
 
+## 🔄 Shiny app — Land Use Change tab
+
+Visualizes gross land-cover *conversions* between classes — not the class totals the Land Use tab shows, but who-converted-to-what. Three diagram types, one panel per selected scenario, side by side (up to 3 per row, wrapping to further rows beyond that):
+
+| Control | Options |
+|---------|---------|
+| **Scenario** | One switch per scenario in `scenarios.csv`; shared with every other tab (toggling here affects, and is affected by, all other tabs) |
+| **Period** | Slider, 2000–2050, default 2020–2050 (hidden for Stacked Bar — see below) |
+| **Diagram type** | Icon dropdown — Chord (default) · Sankey · Stacked Bar |
+
+- **Chord** — a circular diagram; each class is an arc, each conversion an inner band (coloured and tapered by source class).
+- **Sankey** — a flow diagram; classes on the left (start of the Period window) and right (end), one link per conversion.
+- **Stacked Bar** — one bar per 5-year period, one coloured segment per class, showing that period's net change (gains above zero, losses below); always shows the full 2005–2050 trajectory regardless of the Period slider (hence the slider hides for this mode). A shared class-colour legend is shown once above the whole row of scenario panels rather than repeated per panel.
+
+Both Chord and Sankey also draw one extra segment per class — "stayed as X" — sized to that class's *remaining* area after subtracting everything that converted away, so the diagram reflects each class's full starting stock, not just the part that changed.
+
+### Classes and colours
+
+| Class | Colour |
+|-------|--------|
+| Forest | `#1B5E20` (dark green) |
+| NewForest | `#A5D6A7` (light green) |
+| Cropland | `#F4B400` (yellow) |
+| Pasture | `#5E35B1` (purple) |
+| OtherLand | `#8D6E63` (brown) |
+| Urban | `#757575` (grey) |
+
+`NewForest` tracks recently-afforested area — it's zero throughout in a Current Trends scenario but can grow substantially under an NDC/afforestation-policy scenario, so it's shown like any other class rather than hidden.
+
+### Data source
+
+Two tables inside each scenario's xlsx, read once by `01_process_data.R`:
+
+| Table | Sheet | Used for |
+|-------|-------|----------|
+| `calc_landmatrix` | `4_calc_land` | Chord and Sankey — the from→to conversion matrix (6 classes × 10 five-year periods), plus starting-stock area for the "stayed as X" calculation |
+| `ResultsLand` | `LAND` | Stacked Bar — land-cover stock by year, converted to period-over-period net change |
+
+No historical comparison and no CSV download on this tab — both diagram types are purely a scenario-to-scenario (and period-to-period) comparison, with no equivalent historical land-transition data to overlay.
+
 ## 🌾 Shiny app — Crops tab
 
 | Control | Options |
@@ -395,7 +437,7 @@ Neither variable has a historical series — the chart shows scenario lines only
 
 ## 🌎 Shiny app — Maps tab
 
-> ⚠️ **Still hardcoded to the original Current Trends / NDC Commitments pair — not yet updated for the `scenarios.csv`-driven multi-scenario setup used by the other 6 tabs (Land Use, Emissions, Crops, Livestock, Trade, Food).** Adding UP48 (or any other scenario) has no effect here; this tab keeps showing the same `ct`/`ndc` pair regardless of what's active elsewhere. Bringing it in line — reading scenarios from `scenarios.csv`, generalizing the "Difference" column beyond a single pair — is planned for a near-term follow-up, not done in this pass.
+> ⚠️ **Still hardcoded to the original Current Trends / NDC Commitments pair — not yet updated for the `scenarios.csv`-driven multi-scenario setup used by the other 7 tabs (Land Use, Land Use Change, Emissions, Crops, Livestock, Trade, Food).** Adding UP48 (or any other scenario) has no effect here; this tab keeps showing the same `ct`/`ndc` pair regardless of what's active elsewhere. Bringing it in line — reading scenarios from `scenarios.csv`, generalizing the "Difference" column beyond a single pair — is planned for a near-term follow-up, not done in this pass.
 
 Displays static PNG maps generated from the FABLE downscaling model for both scenarios side by side.
 
