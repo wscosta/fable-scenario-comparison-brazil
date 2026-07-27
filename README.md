@@ -64,8 +64,8 @@ All three launchers auto-detect their own location and open the browser automati
 | Scenario metadata | `data/xlsx/scenarios.csv` | Maps each xlsx file to its display label — the single source of truth for which scenarios exist and in what order (see [🗂️ Managing scenarios](#️-managing-scenarios)) |
 | FABLE Calculator spreadsheet(s) | `data/xlsx/` | One `.xlsx` per scenario listed in `scenarios.csv` |
 | Historical reference data | `data/csv/` | Long-format CSV (`histdatabrazil.csv`) with observed data for Brazil |
-| LUC transition matrix — CT | `data/luc/` | Downscaled land-use change data for Current Trends (`downscaled_LUC_mapbiomas_ct.rds`) |
-| LUC transition matrix — NDC | `data/luc/` | Downscaled land-use change data for NDC Commitments (`downscaled_LUC_mapbiomas_ndc.rds`) |
+| LUC transition matrix — CT | `data/luc/` | Downscaled land-use change data for Current Trends (`downscaled_LUC_UP50_ct.rds`) |
+| LUC transition matrix — NDC | `data/luc/` | Downscaled land-use change data for NDC Commitments (`downscaled_LUC_UP50_ndc.rds`) |
 | Cell ID raster | `data/luc/` | `id_raster.tif` — maps FABLE cell IDs to a 0.05° raster grid |
 | State and biome boundaries | `data/shapefiles/` | `br_states.shp`, `br_biomes.shp` — shapefile overlays for maps |
 
@@ -101,8 +101,8 @@ fable-scenario-comparison-brazil/
 │   │   ├── fcidlogo.png                     # FCID logo (pinned right of navbar)
 │   │   └── favicon.svg                      # Browser tab icon (Brazil flag)
 │   ├── luc/
-│   │   ├── downscaled_LUC_mapbiomas_ct.rds # LUC transition matrix — Current Trends
-│   │   ├── downscaled_LUC_mapbiomas_ndc.rds# LUC transition matrix — NDC Commitments
+│   │   ├── downscaled_LUC_UP50_ct.rds       # LUC transition matrix — Current Trends
+│   │   ├── downscaled_LUC_UP50_ndc.rds      # LUC transition matrix — NDC Commitments
 │   │   └── id_raster.tif                    # Cell ID raster (0.05° resolution)
 │   ├── maps/                                # Auto-generated PNGs (gitignored)
 │   │   ├── ct/

@@ -9,8 +9,8 @@
 #   Rscript 04_generate_maps.R ndc      # NDC Commitments only + difference
 #
 # Input:
-#   data/luc/downscaled_LUC_mapbiomas_ct.rds
-#   data/luc/downscaled_LUC_mapbiomas_ndc.rds
+#   data/luc/downscaled_LUC_UP50_ct.rds
+#   data/luc/downscaled_LUC_UP50_ndc.rds
 #   data/luc/id_raster.tif
 #   data/shapefiles/br_states.shp
 #   data/shapefiles/br_biomes.shp
@@ -39,12 +39,12 @@ library(RColorBrewer)
 
 scenarios <- list(
   ct = list(
-    rds     = "data/luc/downscaled_LUC_mapbiomas_ct.rds",
+    rds     = "data/luc/downscaled_LUC_UP50_ct.rds",
     dir_out = "data/maps/ct",
     label   = "Current Trends"
   ),
   ndc = list(
-    rds     = "data/luc/downscaled_LUC_mapbiomas_ndc.rds",
+    rds     = "data/luc/downscaled_LUC_UP50_ndc.rds",
     dir_out = "data/maps/ndc",
     label   = "NDC Commitments"
   )
@@ -260,8 +260,8 @@ run_diff <- function() {
   dir.create(file.path(dir_diff, "landcover"),   showWarnings = FALSE, recursive = TRUE)
   dir.create(file.path(dir_diff, "transitions"), showWarnings = FALSE, recursive = TRUE)
 
-  luc_ct  <- load_luc("data/luc/downscaled_LUC_mapbiomas_ct.rds")
-  luc_ndc <- load_luc("data/luc/downscaled_LUC_mapbiomas_ndc.rds")
+  luc_ct  <- load_luc("data/luc/downscaled_LUC_UP50_ct.rds")
+  luc_ndc <- load_luc("data/luc/downscaled_LUC_UP50_ndc.rds")
 
   years <- sort(unique(luc_ct$year))
 
