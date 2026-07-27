@@ -133,13 +133,14 @@ fable-scenario-comparison-brazil/
 
 ### Historical data (`histdatabrazil.csv`)
 
-Long-format CSV with columns `type`, `source`, `year`, `value`, `unit`. Coverage: 1995–2020 (5-year steps).
+Long-format CSV with columns `type`, `source`, `year`, `value`, `unit`. Coverage: 1995–2020 (5-year steps); Trade's MAPA rows additionally cover 2025/2030/2035.
 
 | Category | Variables | Source |
 |----------|-----------|--------|
 | Land use | Forest, Cropland, Pastures, Secondary Forest, Urban, Other Land | MapBiomas, LAPIG, IBGE |
 | Crop area | Soybean, Maize, Sugarcane, Permanent Crops | IBGE |
-| Production | Ruminant Meat, Soybean, Maize, Sugarcane, Forest Products | FAOSTAT, IBGE |
+| Production | Beef, Milk, Chicken, Pork, Cattle Herd, Soybean, Maize, Sugarcane, Forest Products | IBGE (FAOSTAT also kept as reference) |
+| Trade | Soybean (all/grain/cake/oil), Corn, Beef exports; Wheat imports | Comex (historical); MAPA (2025–2035 projections) |
 | Emissions | CO₂, CH₄, N₂O (AFOLU, enteric fermentation, crop residues, etc.) | SEEG v13 |
 
 ### Scenario data (`xlsx/`)
@@ -389,14 +390,14 @@ All values are in **Mt** (million tonnes). Source: `ProdQ_feas` column from the 
 
 ### Historical reference
 
-Only **Beef** has a historical series (Ruminant Meat, FAOSTAT). For Milk, Chicken and Pork the chart shows scenario lines only; the values table omits the Historical row and no difference tables are shown even in Calibration mode.
+All four products now have a historical series (IBGE) — Calibration mode shows the Historical row plus Absolute/Relative Difference tables for all of them.
 
 | Product | FABLE product | Historical source |
 |---------|--------------|-------------------|
-| Beef | `beef` | Ruminant Meat — FAOSTAT |
-| Milk | `milk` | — |
-| Chicken | `chicken` | — |
-| Pork | `pork` | — |
+| Beef | `beef` | Beef Production — IBGE |
+| Milk | `milk` | Milk Production — IBGE |
+| Chicken | `chicken` | Chicken Production — IBGE |
+| Pork | `pork` | Pork Production — IBGE |
 
 ## 🚢 Shiny app — Trade tab
 
@@ -410,7 +411,11 @@ Only **Beef** has a historical series (Ruminant Meat, FAOSTAT). For Milk, Chicke
 
 The Product selector updates automatically when Type changes. All values are in **Mt** (million tonnes), converted from the `Export_quantity` / `Import_quantity` columns in the FABLE crop table (1 000 t).
 
-No historical data is available for any trade variable — the chart shows FABLE scenario lines only and the right panel shows a values table with no difference tables.
+### Historical reference and MAPA projections
+
+Every product now has a historical series (**Comex**, Brazil's official foreign-trade statistics, 1995–2020) — Calibration mode shows the Historical row plus Absolute/Relative Difference tables, same as the other tabs.
+
+In "Calibration & Projections" mode (x-axis to 2050), every product also shows a separate **"Projections (MAPA)"** series — translucent salmon diamond markers distinct from both the historical line and the FABLE scenario lines. These are forward-looking projections, not historical observations, so they're never labelled "Historical" or merged into that series. Three of the points (2025, 2030, 2035) are Brazil's Ministry of Agriculture's own published projections; a fourth point at **2050** is a linear extrapolation of that trend (fit through all three real points, so it reflects the growth rate across both the 2025→2030 and 2030→2035 intervals) — its hover text notes it's extrapolated, to distinguish it from MAPA's own published figures. "Soybeans (all)" has no combined-product MAPA projection of its own, so its series is the sum of the Soybeans (grain), (cake), and (oil) MAPA projections for each year.
 
 ### Products per type
 
@@ -430,10 +435,10 @@ In addition to production (Mt) for Beef, Milk, Chicken and Pork, the Livestock t
 
 | Variable | Source column | Unit | Data source |
 |----------|--------------|------|-------------|
-| Cattle Herd | `FeasHerd` | Million TLU | `5_feas_livestock`, cattle rows summed (BOVO + BOVD), converted from 1 000 TLU |
+| Cattle Herd | `FeasHerd` | Million head | `5_feas_livestock`, cattle rows summed (BOVO + BOVD), converted from 1 000 head — historical series: Cattle Herd, IBGE |
 | Cattle Stocking Rate | `RumDensity` | TLU/ha | `5_feas_livestock`, cattle rows (same value across sub-types, first taken) |
 
-Neither variable has a historical series — the chart shows scenario lines only with no difference tables.
+Cattle Herd now has a historical series (IBGE) and shows the full Calibration-mode difference tables. Cattle Stocking Rate has no historical series — the chart shows scenario lines only with no difference tables.
 
 ## 🌎 Shiny app — Maps tab
 

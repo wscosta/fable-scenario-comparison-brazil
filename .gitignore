@@ -21,6 +21,9 @@ FABLE_Report_*.pdf
 # Temporary / local scripts
 generate_diff_maps.bat
 
+# Raw staging file for new histdatabrazil.csv rows — merged in, not itself tracked
+data/csv/additional.csv
+
 # OS
 .DS_Store
 Thumbs.db

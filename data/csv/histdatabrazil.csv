@@ -221,4 +221,255 @@ Secondary Forest,Mapbiomas,2005,24.477493,million ha
 Secondary Forest,Mapbiomas,2010,29.467018,million ha
 Secondary Forest,Mapbiomas,2015,33.559351,million ha
 Secondary Forest,Mapbiomas,2020,37.354036,million ha
-
+Soybean (all) Export,Comex,1995,19.47550044,million tonnes
+Soybean (all) Export,Comex,2000,21.93281247,million tonnes
+Soybean (all) Export,Comex,2005,39.38120121,million tonnes
+Soybean (all) Export,Comex,2010,44.30301596,million tonnes
+Soybean (all) Export,Comex,2015,70.82071414,million tonnes
+Soybean (all) Export,Comex,2020,101.0210549,million tonnes
+Soybean (grain) Export,Comex,1995,8.339590024,million tonnes
+Soybean (grain) Export,Comex,2000,11.51707258,million tonnes
+Soybean (grain) Export,Comex,2005,22.29708786,million tonnes
+Soybean (grain) Export,Comex,2010,29.07315606,million tonnes
+Soybean (grain) Export,Comex,2015,54.32423818,million tonnes
+Soybean (grain) Export,Comex,2020,82.97342374,million tonnes
+Soybean (cake) Export,Comex,1995,10.01301896,million tonnes
+Soybean (cake) Export,Comex,2000,9.342775786,million tonnes
+Soybean (cake) Export,Comex,2005,14.38798925,million tonnes
+Soybean (cake) Export,Comex,2010,13.66609917,million tonnes
+Soybean (cake) Export,Comex,2015,14.82659638,million tonnes
+Soybean (cake) Export,Comex,2020,16.93791655,million tonnes
+Soybean (oil) Export,Comex,1995,1.122891453,million tonnes
+Soybean (oil) Export,Comex,2000,1.072964098,million tonnes
+Soybean (oil) Export,Comex,2005,2.6961241,million tonnes
+Soybean (oil) Export,Comex,2010,1.563760725,million tonnes
+Soybean (oil) Export,Comex,2015,1.669879582,million tonnes
+Soybean (oil) Export,Comex,2020,1.109714591,million tonnes
+Corn Export,Comex,1995,0.358168746,million tonnes
+Corn Export,Comex,2000,0.006689326,million tonnes
+Corn Export,Comex,2005,1.071415918,million tonnes
+Corn Export,Comex,2010,10.81873294,million tonnes
+Corn Export,Comex,2015,28.92387907,million tonnes
+Corn Export,Comex,2020,34.43193714,million tonnes
+Beef Export,Comex,1995,0.052383526,million tonnes
+Beef Export,Comex,2000,0.188380864,million tonnes
+Beef Export,Comex,2005,1.082039813,million tonnes
+Beef Export,Comex,2010,0.949093338,million tonnes
+Beef Export,Comex,2015,1.071611915,million tonnes
+Beef Export,Comex,2020,1.724404225,million tonnes
+Wheat Import,Comex,1995,4.363135192,million tonnes
+Wheat Import,Comex,2000,7.77880742,million tonnes
+Wheat Import,Comex,2005,5.055041289,million tonnes
+Wheat Import,Comex,2010,7.003953264,million tonnes
+Wheat Import,Comex,2015,5.521410696,million tonnes
+Wheat Import,Comex,2020,6.458882005,million tonnes
+Beef Production,IBGE,1995,3.334889048,million tonnes
+Beef Production,IBGE,2000,3.899799609,million tonnes
+Beef Production,IBGE,2005,6.345811205,million tonnes
+Beef Production,IBGE,2010,6.977484368,million tonnes
+Beef Production,IBGE,2015,7.493435357,million tonnes
+Beef Production,IBGE,2020,7.824888302,million tonnes
+Beef Production,FAOSTAT,1995,5.7102,million tonnes
+Beef Production,FAOSTAT,2000,6.5788,million tonnes
+Beef Production,FAOSTAT,2005,6.34581,million tonnes
+Beef Production,FAOSTAT,2010,6.977484,million tonnes
+Beef Production,FAOSTAT,2015,8.063225,million tonnes
+Beef Production,FAOSTAT,2020,7.824888,million tonnes
+Milk Production,IBGE,1995,16.474365,million tonnes
+Milk Production,IBGE,2000,19.767206,million tonnes
+Milk Production,IBGE,2005,24.620859,million tonnes
+Milk Production,IBGE,2010,30.71546,million tonnes
+Milk Production,IBGE,2015,34.609588,million tonnes
+Milk Production,IBGE,2020,35.316667,million tonnes
+Milk Production,FAOSTAT,1995,16.9851,million tonnes
+Milk Production,FAOSTAT,2000,20.379988,million tonnes
+Milk Production,FAOSTAT,2005,25.384106,million tonnes
+Milk Production,FAOSTAT,2010,31.636924,million tonnes
+Milk Production,FAOSTAT,2015,35.647876,million tonnes
+Milk Production,FAOSTAT,2020,36.37616701,million tonnes
+Chicken Production,IBGE,1995,3.625340171,million tonnes
+Chicken Production,IBGE,2000,4.613260151,million tonnes
+Chicken Production,IBGE,2005,6.976445626,million tonnes
+Chicken Production,IBGE,2010,9.324191534,million tonnes
+Chicken Production,IBGE,2015,11.20948559,million tonnes
+Chicken Production,IBGE,2020,11.99189427,million tonnes
+Chicken Production,FAOSTAT,1995,4.0504,million tonnes
+Chicken Production,FAOSTAT,2000,5.9806,million tonnes
+Chicken Production,FAOSTAT,2005,7.86578,million tonnes
+Chicken Production,FAOSTAT,2010,10.692556,million tonnes
+Chicken Production,FAOSTAT,2015,13.14920247,million tonnes
+Chicken Production,FAOSTAT,2020,13.78748028,million tonnes
+Pork Production,IBGE,1995,1.010358861,million tonnes
+Pork Production,IBGE,2000,1.344373029,million tonnes
+Pork Production,IBGE,2005,2.156517605,million tonnes
+Pork Production,IBGE,2010,3.078414091,million tonnes
+Pork Production,IBGE,2015,3.430733987,million tonnes
+Pork Production,IBGE,2020,4.482047535,million tonnes
+Pork Production,FAOSTAT,1995,1.8,million tonnes
+Pork Production,FAOSTAT,2000,2.6,million tonnes
+Pork Production,FAOSTAT,2005,2.8,million tonnes
+Pork Production,FAOSTAT,2010,3.195,million tonnes
+Pork Production,FAOSTAT,2015,3.430734,million tonnes
+Pork Production,FAOSTAT,2020,4.48204754,million tonnes
+Cattle Herd,IBGE,1995,112.8595566,million heads
+Cattle Herd,IBGE,2000,118.9128668,million heads
+Cattle Herd,IBGE,2005,145.0096872,million heads
+Cattle Herd,IBGE,2010,146.6787763,million heads
+Cattle Herd,IBGE,2015,150.6543556,million heads
+Cattle Herd,IBGE,2020,152.4853974,million heads
+Cattle Herd,FAOSTAT,1995,16.8147,million heads
+Cattle Herd,FAOSTAT,2000,21.80066,million heads
+Cattle Herd,FAOSTAT,2005,27.601,million heads
+Cattle Herd,FAOSTAT,2010,27.58,million heads
+Cattle Herd,FAOSTAT,2015,26.8555,million heads
+Cattle Herd,FAOSTAT,2020,20.9209252,million heads
+Soybean Area,FAOSTAT,1995,11.675005,million ha
+Soybean Area,FAOSTAT,2000,13.656771,million ha
+Soybean Area,FAOSTAT,2005,22.948874,million ha
+Soybean Area,FAOSTAT,2010,23.327296,million ha
+Soybean Area,FAOSTAT,2015,32.181243,million ha
+Soybean Area,FAOSTAT,2020,37.191638,million ha
+Soybean Area,MAPA,2025,47.1041,million ha
+Soybean Area,MAPA,2030,52.9931,million ha
+Soybean Area,MAPA,2035,57.5605,million ha
+Maize Area,FAOSTAT,1995,13.94632,million ha
+Maize Area,FAOSTAT,2000,11.890376,million ha
+Maize Area,FAOSTAT,2005,11.549425,million ha
+Maize Area,FAOSTAT,2010,12.678875,million ha
+Maize Area,FAOSTAT,2015,15.407143,million ha
+Maize Area,FAOSTAT,2020,18.258981,million ha
+Maize Area,MAPA,2025,21.2596,million ha
+Maize Area,MAPA,2030,22.2626,million ha
+Maize Area,MAPA,2035,23.065,million ha
+Sugarcane Area,FAOSTAT,1995,4.559062,million ha
+Sugarcane Area,FAOSTAT,2000,4.804511,million ha
+Sugarcane Area,FAOSTAT,2005,5.805518,million ha
+Sugarcane Area,FAOSTAT,2010,9.076706,million ha
+Sugarcane Area,FAOSTAT,2015,10.111376,million ha
+Sugarcane Area,FAOSTAT,2020,9.996134,million ha
+Sugarcane Area,MAPA,2025,8.870430131,million ha
+Sugarcane Area,MAPA,2030,9.55387191,million ha
+Sugarcane Area,MAPA,2035,10.102,million ha
+Soybean Production,FAOSTAT,1995,25.682637,million tonnes
+Soybean Production,FAOSTAT,2000,32.820826,million tonnes
+Soybean Production,FAOSTAT,2005,51.182072,million tonnes
+Soybean Production,FAOSTAT,2010,68.756343,million tonnes
+Soybean Production,FAOSTAT,2015,97.464936,million tonnes
+Soybean Production,FAOSTAT,2020,121.820949,million tonnes
+Soybean Production,MAPA,2025,158.349,million tonnes
+Soybean Production,MAPA,2030,182.577,million tonnes
+Soybean Production,MAPA,2035,199.453,million tonnes
+Maize Production,FAOSTAT,1995,36.266951,million tonnes
+Maize Production,FAOSTAT,2000,32.321,million tonnes
+Maize Production,FAOSTAT,2005,35.113312,million tonnes
+Maize Production,FAOSTAT,2010,55.364271,million tonnes
+Maize Production,FAOSTAT,2015,85.283074,million tonnes
+Maize Production,FAOSTAT,2020,103.990935,million tonnes
+Maize Production,MAPA,2025,119.465,million tonnes
+Maize Production,MAPA,2030,138.173,million tonnes
+Maize Production,MAPA,2035,153.14,million tonnes
+Sugarcane Production,FAOSTAT,1995,303.699497,million tonnes
+Sugarcane Production,FAOSTAT,2000,326.121011,million tonnes
+Sugarcane Production,FAOSTAT,2005,422.956646,million tonnes
+Sugarcane Production,FAOSTAT,2010,717.463793,million tonnes
+Sugarcane Production,FAOSTAT,2015,750.290277,million tonnes
+Sugarcane Production,FAOSTAT,2020,756.070576,million tonnes
+Sugarcane Production,MAPA,2025,716.76,million tonnes
+Sugarcane Production,MAPA,2030,790.952,million tonnes
+Sugarcane Production,MAPA,2035,850.284,million tonnes
+Maize Yield,IBGE,1995,2.6,t/ha
+Maize Yield,IBGE,2000,2.718,t/ha
+Maize Yield,IBGE,2005,3.04,t/ha
+Maize Yield,IBGE,2010,4.366,t/ha
+Maize Yield,IBGE,2015,5.535,t/ha
+Maize Yield,IBGE,2020,5.695,t/ha
+Maize Yield,FAOSTAT,1995,2.6005,t/ha
+Maize Yield,FAOSTAT,2000,2.7182,t/ha
+Maize Yield,FAOSTAT,2005,3.0403,t/ha
+Maize Yield,FAOSTAT,2010,4.3667,t/ha
+Maize Yield,FAOSTAT,2015,5.5353,t/ha
+Maize Yield,FAOSTAT,2020,5.6953,t/ha
+Soy beans Yield,IBGE,1995,2.199,t/ha
+Soy beans Yield,IBGE,2000,2.403,t/ha
+Soy beans Yield,IBGE,2005,2.23,t/ha
+Soy beans Yield,IBGE,2010,2.947,t/ha
+Soy beans Yield,IBGE,2015,3.029,t/ha
+Soy beans Yield,IBGE,2020,3.275,t/ha
+Soy beans Yield,FAOSTAT,1995,2.1998,t/ha
+Soy beans Yield,FAOSTAT,2000,2.4033,t/ha
+Soy beans Yield,FAOSTAT,2005,2.2303,t/ha
+Soy beans Yield,FAOSTAT,2010,2.9475,t/ha
+Soy beans Yield,FAOSTAT,2015,3.0286,t/ha
+Soy beans Yield,FAOSTAT,2020,3.2755,t/ha
+Sugarcane Yield,IBGE,1995,66.614,t/ha
+Sugarcane Yield,IBGE,2000,67.878,t/ha
+Sugarcane Yield,IBGE,2005,72.854,t/ha
+Sugarcane Yield,IBGE,2010,79.044,t/ha
+Sugarcane Yield,IBGE,2015,74.203,t/ha
+Sugarcane Yield,IBGE,2020,75.636,t/ha
+Sugarcane Yield,FAOSTAT,1995,66.6145,t/ha
+Sugarcane Yield,FAOSTAT,2000,67.8781,t/ha
+Sugarcane Yield,FAOSTAT,2005,72.8542,t/ha
+Sugarcane Yield,FAOSTAT,2010,79.0445,t/ha
+Sugarcane Yield,FAOSTAT,2015,74.2026,t/ha
+Sugarcane Yield,FAOSTAT,2020,75.6363,t/ha
+Wheat Import,FAOSTAT,1995,6.135235,million tonnes
+Wheat Import,FAOSTAT,2000,7.523008,million tonnes
+Wheat Import,FAOSTAT,2005,4.988139,million tonnes
+Wheat Import,FAOSTAT,2010,6.323216,million tonnes
+Wheat Import,FAOSTAT,2015,5.17043931,million tonnes
+Wheat Import,FAOSTAT,2020,6.15992581,million tonnes
+Wheat Import,MAPA,2025,6.08,million tonnes
+Wheat Import,MAPA,2030,6.106,million tonnes
+Wheat Import,MAPA,2035,6.106,million tonnes
+Soybean (all) Export,FAOSTAT,1995,16.856484,million tonnes
+Soybean (all) Export,FAOSTAT,2000,21.979443,million tonnes
+Soybean (all) Export,FAOSTAT,2005,39.553806,million tonnes
+Soybean (all) Export,FAOSTAT,2010,44.301575,million tonnes
+Soybean (all) Export,FAOSTAT,2015,70.82084911,million tonnes
+Soybean (all) Export,FAOSTAT,2020,101.021138,million tonnes
+Soybean (grain) Export,FAOSTAT,1995,3.492525,million tonnes
+Soybean (grain) Export,FAOSTAT,2000,11.51726,million tonnes
+Soybean (grain) Export,FAOSTAT,2005,22.435072,million tonnes
+Soybean (grain) Export,FAOSTAT,2010,29.0732,million tonnes
+Soybean (grain) Export,FAOSTAT,2015,54.3242382,million tonnes
+Soybean (grain) Export,FAOSTAT,2020,82.97341318,million tonnes
+Soybean (grain) Export,MAPA,2025,104.55,million tonnes
+Soybean (grain) Export,MAPA,2030,117.911,million tonnes
+Soybean (grain) Export,MAPA,2035,130.767,million tonnes
+Soybean (cake) Export,FAOSTAT,1995,11.6,million tonnes
+Soybean (cake) Export,FAOSTAT,2000,9.389189,million tonnes
+Soybean (cake) Export,FAOSTAT,2005,14.42168,million tonnes
+Soybean (cake) Export,FAOSTAT,2010,13.668599,million tonnes
+Soybean (cake) Export,FAOSTAT,2015,14.82666238,million tonnes
+Soybean (cake) Export,FAOSTAT,2020,16.9379157,million tonnes
+Soybean (cake) Export,MAPA,2025,20.654,million tonnes
+Soybean (cake) Export,MAPA,2030,22.013,million tonnes
+Soybean (cake) Export,MAPA,2035,23.263,million tonnes
+Soybean (oil) Export,FAOSTAT,1995,1.763959,million tonnes
+Soybean (oil) Export,FAOSTAT,2000,1.072994,million tonnes
+Soybean (oil) Export,FAOSTAT,2005,2.697054,million tonnes
+Soybean (oil) Export,FAOSTAT,2010,1.559776,million tonnes
+Soybean (oil) Export,FAOSTAT,2015,1.66994853,million tonnes
+Soybean (oil) Export,FAOSTAT,2020,1.10980915,million tonnes
+Soybean (oil) Export,MAPA,2025,1.391,million tonnes
+Soybean (oil) Export,MAPA,2030,1.373,million tonnes
+Soybean (oil) Export,MAPA,2035,1.355,million tonnes
+Corn Export,FAOSTAT,1995,0.011046,million tonnes
+Corn Export,FAOSTAT,2000,0.006699,million tonnes
+Corn Export,FAOSTAT,2005,1.070016,million tonnes
+Corn Export,FAOSTAT,2010,10.815275,million tonnes
+Corn Export,FAOSTAT,2015,28.92395145,million tonnes
+Corn Export,FAOSTAT,2020,34.43193609,million tonnes
+Corn Export,MAPA,2025,47.187,million tonnes
+Corn Export,MAPA,2030,49.121,million tonnes
+Corn Export,MAPA,2035,58.29,million tonnes
+Beef Export,FAOSTAT,1995,0.0375,million tonnes
+Beef Export,FAOSTAT,2000,0.18865596,million tonnes
+Beef Export,FAOSTAT,2005,1.085589,million tonnes
+Beef Export,FAOSTAT,2010,0.951255,million tonnes
+Beef Export,FAOSTAT,2015,1.07911802,million tonnes
+Beef Export,FAOSTAT,2020,1.72440319,million tonnes
+Beef Export,MAPA,2025,3.608,million tonnes
+Beef Export,MAPA,2030,4.126,million tonnes
+Beef Export,MAPA,2035,4.54,million tonnes

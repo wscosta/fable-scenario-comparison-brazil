@@ -574,16 +574,25 @@ make_crop_rel_diff_colored <- function(crop_name, type_sel, scenario_sel) {
 # Entries with fable_col come from df_livestock (5_feas_livestock sheet).
 livestock_map <- list(
   "Beef Production"    = list(fable_product = "beef",    prod_unit = "1000 t",
-                              hist_type = "Ruminant Meat", hist_source = "FAOSTAT", has_hist = TRUE,
+                              hist_type = "Beef Production", hist_source = "IBGE", has_hist = TRUE,
                               y_label = "Production (Mt)", unit_label = "Mt"),
-  "Milk Production"    = list(fable_product = "milk",    prod_unit = "1000 t", has_hist = FALSE,
+  "Milk Production"    = list(fable_product = "milk",    prod_unit = "1000 t",
+                              hist_type = "Milk Production", hist_source = "IBGE", has_hist = TRUE,
                               y_label = "Production (Mt)", unit_label = "Mt"),
-  "Chicken Production" = list(fable_product = "chicken", prod_unit = "1000 t", has_hist = FALSE,
+  "Chicken Production" = list(fable_product = "chicken", prod_unit = "1000 t",
+                              hist_type = "Chicken Production", hist_source = "IBGE", has_hist = TRUE,
                               y_label = "Production (Mt)", unit_label = "Mt"),
-  "Pork Production"    = list(fable_product = "pork",    prod_unit = "1000 t", has_hist = FALSE,
+  "Pork Production"    = list(fable_product = "pork",    prod_unit = "1000 t",
+                              hist_type = "Pork Production", hist_source = "IBGE", has_hist = TRUE,
                               y_label = "Production (Mt)", unit_label = "Mt"),
-  "Cattle Herd" = list(fable_col = "FeasHerd", unit_divisor = 1000, has_hist = FALSE,
-                        y_label = "Cattle Herd (Million TLU)", unit_label = "Million TLU"),
+  # FeasHerd/1000 lines up almost exactly with IBGE's head count (e.g. 2020:
+  # 153.2 vs 152.5 million) — confirmed empirically this is head count, not
+  # TLU, despite the unit/label previously assuming TLU. FAOSTAT's own
+  # "Cattle Herd" series (~17-27 million throughout) is a different, much
+  # smaller subset and is NOT used here.
+  "Cattle Herd" = list(fable_col = "FeasHerd", unit_divisor = 1000,
+                        hist_type = "Cattle Herd", hist_source = "IBGE", has_hist = TRUE,
+                        y_label = "Cattle Herd (Million head)", unit_label = "Million head"),
   "Cattle Stocking Rate" = list(fable_col = "RumDensity", unit_divisor = 1, has_hist = FALSE,
                                  y_label = "Density (TLU/ha)", unit_label = "TLU/ha")
 )
@@ -719,7 +728,22 @@ make_live_rel_diff_colored <- function(product, scenario_sel) {
 
 # ── Trade configuration ───────────────────────────────────────────────────────
 # Data from df_crops: Export_quantity / Import_quantity, both in 1000 t → Mt.
-# No historical series — values table only, no diff tables.
+# hist_type maps each product to its matching histdatabrazil.csv "type" string
+# (Comex = Brazil's own official foreign-trade statistics, used as the primary
+# historical source here the same way IBGE is primary for domestic production
+# elsewhere). MAPA rows (source == "MAPA", years 2025/2030/2035) are Brazil's
+# Ministry of Agriculture's own forward projections, not historical
+# observations — kept as a separate "Projections (MAPA)" trace/row rather than
+# folded into "Historical" (see get_trade_projection/add_projection_trace).
+# "Soybeans (all)" has no MAPA row of its own (no combined-product projection
+# exists in the source data) — proj_hist_type gives it a vector of the 3
+# sub-product MAPA types instead, so get_trade_projection sums grain+cake+oil
+# per year rather than looking up a single (missing) type. hist_type (the
+# real Comex/FAOSTAT historical series) is unaffected — "Soybean (all)
+# Export" already exists directly in the source data for that.
+TRADE_HIST_SOURCE <- "Comex"
+TRADE_PROJ_SOURCE <- "MAPA"
+
 trade_map <- list(
   "Exports" = list(
     fable_col = "Export_quantity",
@@ -733,13 +757,25 @@ trade_map <- list(
       "Soybeans (oil)"   = "soyoil",
       "Corn"             = "corn",
       "Beef"             = "beef"
+    ),
+    hist_type = list(
+      "Soybeans (all)"   = "Soybean (all) Export",
+      "Soybeans (grain)" = "Soybean (grain) Export",
+      "Soybeans (cake)"  = "Soybean (cake) Export",
+      "Soybeans (oil)"   = "Soybean (oil) Export",
+      "Corn"             = "Corn Export",
+      "Beef"             = "Beef Export"
+    ),
+    proj_hist_type = list(
+      "Soybeans (all)" = c("Soybean (grain) Export", "Soybean (cake) Export", "Soybean (oil) Export")
     )
   ),
   "Imports" = list(
     fable_col = "Import_quantity",
     unit      = "1000 t",
     products  = c("Wheat"),
-    fable_product = list("Wheat" = "wheat")
+    fable_product = list("Wheat" = "wheat"),
+    hist_type     = list("Wheat" = "Wheat Import")
   )
 )
 
@@ -758,13 +794,74 @@ get_trade_fable <- function(trade_type, product, scenario_name, x_max) {
     rename(year = Year)
 }
 
+get_trade_hist <- function(trade_type, product, x_max) {
+  ht <- trade_map[[trade_type]]$hist_type[[product]]
+  if (is.null(ht)) return(tibble(year = integer(), value = numeric()))
+  hmax <- min(x_max, 2020)
+  df_hist %>%
+    filter(trimws(type) == ht, trimws(source) == TRADE_HIST_SOURCE,
+           year > 1995, year <= hmax) %>%
+    select(year, value) %>%
+    mutate(value = as.numeric(value))
+}
+
+get_trade_projection <- function(trade_type, product, x_max) {
+  cfg <- trade_map[[trade_type]]
+  ht  <- cfg$hist_type[[product]]
+  if (is.null(ht)) return(tibble(year = integer(), value = numeric(), extrapolated = logical()))
+  # proj_types is normally just ht (one type), but "Soybeans (all)" has no
+  # MAPA row of its own — proj_hist_type gives it grain+cake+oil's types
+  # instead, summed per year below, per explicit user request.
+  proj_types <- if (!is.null(cfg$proj_hist_type[[product]])) cfg$proj_hist_type[[product]] else ht
+  real <- df_hist %>%
+    filter(trimws(type) %in% proj_types, trimws(source) == TRADE_PROJ_SOURCE, year <= x_max) %>%
+    mutate(value = as.numeric(value)) %>%
+    group_by(year) %>%
+    summarise(value = sum(value, na.rm = TRUE), .groups = "drop") %>%
+    mutate(extrapolated = FALSE) %>%
+    arrange(year)
+
+  # Extend MAPA's own trend out to 2050 via linear regression on its three
+  # real points (2025/2030/2035) — an OLS fit through all three captures the
+  # growth rate across both the 2025->2030 and 2030->2035 intervals (not just
+  # the last one), per explicit user request. Flagged `extrapolated = TRUE`
+  # so the hover text can distinguish it from MAPA's own published figures.
+  if (x_max >= 2050 && nrow(real) >= 2 && !(2050 %in% real$year)) {
+    fit      <- lm(value ~ year, data = real)
+    val_2050 <- unname(predict(fit, newdata = data.frame(year = 2050)))
+    real <- bind_rows(real, tibble(year = 2050, value = val_2050, extrapolated = TRUE))
+  }
+  real
+}
+
 calc_trade_y_range <- function(trade_type, product, x_max, zero_base = TRUE) {
-  all_vals <- bind_rows(lapply(available_scenarios, get_trade_fable,
+  scen_vals <- bind_rows(lapply(available_scenarios, get_trade_fable,
                                trade_type = trade_type, product = product, x_max = x_max))$value
+  hist_vals <- get_trade_hist(trade_type, product, x_max)$value
+  proj_vals <- get_trade_projection(trade_type, product, x_max)$value
+  all_vals  <- c(scen_vals, hist_vals, proj_vals)
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
   y_min <- if (zero_base && min(all_vals, na.rm = TRUE) >= 0) 0
             else min(all_vals, na.rm = TRUE) - pad
   c(y_min, max(all_vals, na.rm = TRUE) + pad)
+}
+
+# Discrete future anchor points (MAPA's own 2025/2030/2035 projections, plus
+# the linear-extrapolated 2050 point from get_trade_projection) — always
+# rendered as markers regardless of chart_type, since these are isolated
+# reference points, not a series meant to look like a line/bar/area. Salmon,
+# translucent diamonds per explicit user request (previously solid grey).
+add_projection_trace <- function(p, proj_data, unit_label = "Mt") {
+  if (nrow(proj_data) == 0) return(p)
+  trace_name  <- "Projections (MAPA)"
+  proj_data$note <- ifelse(proj_data$extrapolated,
+                            " (extrapolated from 2025-35 trend)", "")
+  hover <- paste0("%{x}: <b>%{y:.2f} ", unit_label, "</b>%{customdata}<extra>", trace_name, "</extra>")
+  add_trace(p, data = proj_data, x = ~year, y = ~value, customdata = ~note,
+            type = "scatter", mode = "markers", name = trace_name,
+            marker = list(color = hex_to_rgba("#FA8072", 0.55), size = 10, symbol = "diamond",
+                          line = list(color = "#C0392B", width = 1)),
+            hovertemplate = hover)
 }
 
 # ── Trade plot builders ───────────────────────────────────────────────────────
@@ -776,6 +873,12 @@ make_trade_plot <- function(trade_type, product, scenario_sel, x_max, y_range, c
     hover <- paste0("%{x}: <b>%{y:.2f} Mt</b><extra>", s, "</extra>")
     p <- add_scenario_trace(p, dat, s, scenario_colors[[s]], chart_type, hover)
   }
+
+  hist_data <- get_trade_hist(trade_type, product, x_max)
+  p <- add_hist_trace(p, hist_data, TRADE_HIST_SOURCE, chart_type, "Mt")
+
+  proj_data <- get_trade_projection(trade_type, product, x_max)
+  p <- add_projection_trace(p, proj_data, "Mt")
 
   base_layout(p, paste0(product, " ", trade_type),
               x_max = x_max, y_range = y_range, y_label = paste0(trade_type, " (Mt)"),
@@ -793,10 +896,60 @@ make_trade_table_data <- function(trade_type, product, scenario_sel, x_max) {
   rows <- list()
   for (s in scenario_sel) rows[[s]] <- pull_fable(s)
 
+  hist_data <- get_trade_hist(trade_type, product, min(x_max, 2020))
+  rows[["Historical"]] <- sapply(years, function(y) {
+    if (y > 2020) return(NA_real_)
+    v <- hist_data$value[hist_data$year == y]
+    if (length(v) == 0) NA_real_ else v[1]
+  })
+
+  proj_data <- get_trade_projection(trade_type, product, x_max)
+  if (nrow(proj_data) > 0) {
+    rows[["Projections (MAPA)"]] <- sapply(years, function(y) {
+      v <- proj_data$value[proj_data$year == y]
+      if (length(v) == 0) NA_real_ else v[1]
+    })
+  }
+
   mat <- do.call(rbind, rows)
   df  <- as.data.frame(mat)
   colnames(df) <- as.character(years)
   cbind(` ` = rownames(df), df, stringsAsFactors = FALSE)
+}
+
+# ── Trade difference table builders ───────────────────────────────────────────
+make_trade_diff_data <- function(trade_type, product, scenario_sel, type = "absolute") {
+  years <- seq(2000, 2020, 5)
+
+  hist_data <- get_trade_hist(trade_type, product, 2020)
+  hist_vals <- sapply(years, function(y) {
+    v <- hist_data$value[hist_data$year == y]
+    if (length(v) == 0) NA_real_ else v[1]
+  })
+
+  pull_fable <- function(scen_name)
+    get_trade_fable(trade_type, product, scen_name, 2020) %>%
+      filter(year %in% years) %>% arrange(year) %>% pull(value)
+
+  rows <- list()
+  for (s in scenario_sel) {
+    v <- pull_fable(s)
+    rows[[s]] <- if (type == "absolute") abs(v - hist_vals)
+                 else (v - hist_vals) / hist_vals * 100
+  }
+
+  mat <- do.call(rbind, rows)
+  df  <- as.data.frame(mat)
+  colnames(df) <- as.character(years)
+  cbind(` ` = rownames(df), df, stringsAsFactors = FALSE)
+}
+
+make_trade_rel_diff_colored <- function(trade_type, product, scenario_sel) {
+  df    <- make_trade_diff_data(trade_type, product, scenario_sel, "relative")
+  years <- names(df)[-1]
+  for (y in years)
+    df[[y]] <- vapply(as.numeric(df[[y]]), color_rel_val, character(1))
+  df
 }
 
 # ── Food configuration ────────────────────────────────────────────────────────
@@ -2100,14 +2253,31 @@ server <- function(input, output, session) {
     req(input$trade_type %in% names(trade_map),
         input$trade_product %in% trade_map[[input$trade_type]]$products)
 
-    right_col <- tagList(
-      div(style = "display:flex; align-items:center; gap:8px;",
-          strong(paste0(input$trade_type, " (Mt)")),
-          downloadButton("trade_dl", "CSV",
-                         style = "padding:2px 8px; font-size:11px; height:24px; line-height:20px;")),
-      div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
-          tableOutput("trade_data_table"))
-    )
+    right_col <- if (isTRUE(input$trade_years)) {
+      tagList(
+        div(style = "display:flex; align-items:center; gap:8px;",
+            strong(paste0(input$trade_type, " (Mt)")),
+            downloadButton("trade_dl", "CSV",
+                           style = "padding:2px 8px; font-size:11px; height:24px; line-height:20px;")),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("trade_data_table")),
+        strong("Absolute Difference (Mt)"),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("trade_abs_diff_table")),
+        strong("Relative Difference (%)"),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("trade_rel_diff_table"))
+      )
+    } else {
+      tagList(
+        div(style = "display:flex; align-items:center; gap:8px;",
+            strong(paste0(input$trade_type, " (Mt)")),
+            downloadButton("trade_dl", "CSV",
+                           style = "padding:2px 8px; font-size:11px; height:24px; line-height:20px;")),
+        div(style = "overflow-x: auto; margin-top: 6px; font-size: 11px;",
+            tableOutput("trade_data_table"))
+      )
+    }
 
     req(length(trade_scen_sel()) > 0)
     chart_out <- plotlyOutput("trade_plot_main", height = "460px")
@@ -2125,6 +2295,15 @@ server <- function(input, output, session) {
     make_trade_table_data(input$trade_type, input$trade_product,
                           trade_scen_sel(), trade_x_max()),
     digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+  output$trade_abs_diff_table <- renderTable(
+    make_trade_diff_data(input$trade_type, input$trade_product, trade_scen_sel(), "absolute"),
+    digits = 2, na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
+  )
+  output$trade_rel_diff_table <- renderTable(
+    make_trade_rel_diff_colored(input$trade_type, input$trade_product, trade_scen_sel()),
+    sanitize.text.function = identity,
+    na = "", striped = TRUE, bordered = TRUE, rownames = FALSE
   )
   output$trade_dl <- downloadHandler(
     filename = function() {
