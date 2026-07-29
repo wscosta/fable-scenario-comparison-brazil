@@ -6,14 +6,17 @@ An interactive R Shiny app to compare any number of [FABLE Calculator](https://f
 
 The FABLE Calculator is a spreadsheet-based land-use modelling tool developed by the FABLE Consortium to explore national pathways toward sustainable food and land-use systems. This project reads any number of Brazil-specific scenario files (configured in `data/xlsx/scenarios.csv`) and overlays their outputs with historical reference data (2000–2020), enabling visual comparison across land-use classes and time periods.
 
-The app ships with four scenarios — two calibrations (UP50, UP48), each with two pathways:
+The app ships with seven scenarios across four calibrations (UP51, UP50, UP48, UP46) — UP51/UP50/UP48 each with both pathways, UP46 currently only with Current Trends:
 
 | Scenario | Description |
 |----------|-------------|
+| **UP51 - Current Trends** | Business-as-usual trajectory, UP51 calibration |
+| **UP51 - NDC Commitments** | Nationally Determined Contribution targets, UP51 calibration |
 | **UP50 - Current Trends** | Business-as-usual trajectory, UP50 calibration |
 | **UP50 - NDC Commitments** | Nationally Determined Contribution targets, UP50 calibration |
 | **UP48 - Current Trends** | Business-as-usual trajectory, UP48 calibration |
 | **UP48 - NDC Commitments** | Nationally Determined Contribution targets, UP48 calibration |
+| **UP46 - Current Trends** | Business-as-usual trajectory, UP46 calibration |
 
 Adding more scenarios (another UP calibration, another policy pathway, …) is just a new xlsx file plus a new row in `scenarios.csv` — no code changes needed. See [🗂️ Managing scenarios](#️-managing-scenarios) below.
 
@@ -77,15 +80,18 @@ All three launchers auto-detect their own location and open the browser automati
 
 ```csv
 file,label,up
+FABLECalculator_BRA_UP51_CurrentTrends.xlsx,UP51 - Current Trends,51
+FABLECalculator_BRA_UP51_NDC.xlsx,UP51 - NDC Commitments,51
 FABLECalculator_BRA_UP50_CurrentTrends.xlsx,UP50 - Current Trends,50
 FABLECalculator_BRA_UP50_NDC.xlsx,UP50 - NDC Commitments,50
 FABLECalculator_BRA_UP48_CurrentTrends.xlsx,UP48 - Current Trends,48
 FABLECalculator_BRA_UP48_NDC.xlsx,UP48 - NDC Commitments,48
+FABLECalculator_BRA_UP46_CurrentTrends.xlsx,UP46 - Current Trends,46
 ```
 
 **To add a scenario:** drop the new `.xlsx` file into `data/xlsx/` and add a row to `scenarios.csv` with its filename and display label. The app detects the change automatically on next launch (comparing the scenario labels on disk to what's cached in `data/processed/`) and reprocesses if needed — no need to delete `data/processed/` by hand, though doing so also works. Any number of scenarios can be selected at once via the **Scenario** switches on each tab.
 
-**Default-on scenarios:** the optional `up` column controls which switches start checked — only the rows with the *highest* `up` value default to on (currently the two UP50 rows); everything else starts off but is still selectable. Adding a new, higher-numbered UP row automatically becomes the new default the next time the app launches, no code changes needed. Omitting the `up` column entirely makes every scenario default to checked.
+**Default-on scenarios:** the optional `up` column controls which switches start checked — only the rows with the *highest* `up` value default to on (currently the two UP51 rows); everything else starts off but is still selectable. Adding a new, higher-numbered UP row automatically becomes the new default the next time the app launches, no code changes needed. Omitting the `up` column entirely makes every scenario default to checked.
 
 **Switches stay in sync across tabs:** toggling a scenario on or off on any tab (Land Use, Land Use Change, Emissions, Crops, Livestock, Trade, Food) applies the same change everywhere else — there's one shared selection, not seven independent ones.
 
