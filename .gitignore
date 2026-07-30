@@ -1,0 +1,30 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj.user
+
+# Generated data (reproduced by 01_process_data.R)
+data/processed/
+
+# Generated maps (reproduced by 04_generate_maps.R)
+data/maps/
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+# Report outputs
+FABLE_Report_*.docx
+FABLE_Report_*.pdf
+
+# Temporary / local scripts
+generate_diff_maps.bat
+
+# Raw staging file for new histdatabrazil.csv rows — merged in, not itself tracked
+data/csv/additional.csv
+
+# OS
+.DS_Store
+Thumbs.db
+
