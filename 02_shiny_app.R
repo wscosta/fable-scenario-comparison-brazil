@@ -5,18 +5,30 @@ suppressPackageStartupMessages(library(plotly))
 suppressPackageStartupMessages(library(bslib))
 suppressPackageStartupMessages(library(chorddiag))
 
-# Run 01_process_data.R if any processed file is missing, or if the scenario
-# set on disk (data/xlsx/scenarios.csv) no longer matches what's cached.
+# Run 01_process_data.R if any processed file is missing, if the scenario set
+# on disk (data/xlsx/scenarios.csv) no longer matches what's cached, or if any
+# source file was modified more recently than the cache. That last check is
+# what catches an in-place edit to an existing xlsx (same filename/label) —
+# the label-set comparison alone can't see that, since nothing about which
+# scenarios exist actually changed.
+PROCESSED_FILES <- c("data/processed/df_scenarios.rds", "data/processed/fable_units.rds",
+                     "data/processed/df_crops.rds",     "data/processed/df_livestock.rds",
+                     "data/processed/df_luc_matrix.rds", "data/processed/df_luc_stock.rds")
+
 needs_reprocess <- function() {
-  if (!file.exists("data/processed/df_scenarios.rds") ||
-      !file.exists("data/processed/fable_units.rds")  ||
-      !file.exists("data/processed/df_crops.rds")     ||
-      !file.exists("data/processed/df_livestock.rds") ||
-      !file.exists("data/processed/df_luc_matrix.rds") ||
-      !file.exists("data/processed/df_luc_stock.rds")) return(TRUE)
+  if (!all(file.exists(PROCESSED_FILES))) return(TRUE)
+
+  scenario_meta <- read.csv("data/xlsx/scenarios.csv", stringsAsFactors = FALSE)
   cached  <- sort(unique(readRDS("data/processed/df_scenarios.rds")$scenario))
-  current <- sort(read.csv("data/xlsx/scenarios.csv", stringsAsFactors = FALSE)$label)
-  !identical(cached, current)
+  current <- sort(scenario_meta$label)
+  if (!identical(cached, current)) return(TRUE)
+
+  source_files <- c("data/xlsx/scenarios.csv", "data/csv/histdatabrazil.csv",
+                    file.path("data/xlsx", scenario_meta$file))
+  source_files <- source_files[file.exists(source_files)]
+  newest_source    <- max(file.info(source_files)$mtime)
+  oldest_processed <- min(file.info(PROCESSED_FILES)$mtime)
+  newest_source > oldest_processed
 }
 if (needs_reprocess()) source("01_process_data.R")
 

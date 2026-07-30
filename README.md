@@ -89,7 +89,7 @@ FABLECalculator_BRA_UP48_NDC.xlsx,UP48 - NDC Commitments,48
 FABLECalculator_BRA_UP46_CurrentTrends.xlsx,UP46 - Current Trends,46
 ```
 
-**To add a scenario:** drop the new `.xlsx` file into `data/xlsx/` and add a row to `scenarios.csv` with its filename and display label. The app detects the change automatically on next launch (comparing the scenario labels on disk to what's cached in `data/processed/`) and reprocesses if needed — no need to delete `data/processed/` by hand, though doing so also works. Any number of scenarios can be selected at once via the **Scenario** switches on each tab.
+**To add a scenario:** drop the new `.xlsx` file into `data/xlsx/` and add a row to `scenarios.csv` with its filename and display label. The app detects the change automatically on next launch and reprocesses if needed — no need to delete `data/processed/` by hand, though doing so also works. This also covers **editing an existing scenario's xlsx in place** (same filename/label, just corrected data) — the app compares each source file's modification time against the cache and reprocesses if any xlsx, `scenarios.csv`, or `histdatabrazil.csv` is newer. Any number of scenarios can be selected at once via the **Scenario** switches on each tab.
 
 **Default-on scenarios:** the optional `up` column controls which switches start checked — only the rows with the *highest* `up` value default to on (currently the two UP51 rows); everything else starts off but is still selectable. Adding a new, higher-numbered UP row automatically becomes the new default the next time the app launches, no code changes needed. Omitting the `up` column entirely makes every scenario default to checked.
 
