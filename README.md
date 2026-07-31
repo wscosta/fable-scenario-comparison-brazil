@@ -451,12 +451,12 @@ Cattle Herd now has a historical series (IBGE) and shows the full Calibration-mo
 
 ## 🌎 Shiny app — Maps tab
 
-Displays static PNG maps generated from the FABLE downscaling model. Like the other tabs, scenarios are picked via switches from `scenarios.csv` — but **capped at exactly 2 selected at once**, since this tab shows a left/right pair plus a difference map (a diff only makes sense between 2 scenarios). Turning on a 3rd switch reverts it automatically with a short notice. These switches are independent of every other tab's — toggling a scenario here doesn't affect (and isn't affected by) Land Use, Emissions, etc. **Defaults to whichever UP calibration currently has both Current Trends and NDC downscaled (today, UP50)** rather than the newest UP overall, so the tab opens showing real maps instead of "not available" placeholders.
+Displays static PNG maps generated from the FABLE downscaling model. Like the other tabs, scenarios are picked via switches — but **only scenarios with downscaled map data get a switch at all** (unlike every other tab, which shows all of `scenarios.csv`), and selection is **capped at exactly 2 at once**, since this tab shows a left/right pair plus a difference map (a diff only makes sense between 2 scenarios). Turning on a 3rd switch reverts it automatically with a short notice. These switches are independent of every other tab's — toggling a scenario here doesn't affect (and isn't affected by) Land Use, Emissions, etc. **Defaults to whichever UP calibration currently has both Current Trends and NDC downscaled (today, UP50)** rather than the newest UP overall, so the tab opens showing real maps instead of "not available" placeholders.
 
 | Control | Options |
 |---------|---------|
 | **Map Type** | Land Cover · Outflows · Transitions |
-| **Scenario** | Any 2 scenarios from `scenarios.csv` (switches, capped at 2) |
+| **Scenario** | Any 2 scenarios that have downscaled map data (switches, capped at 2) |
 | **Class / Transition** | Depends on Map Type (see below) |
 | **Year** | 2020 · 2025 · 2030 · 2035 · 2040 · 2045 · 2050 |
 
@@ -471,6 +471,8 @@ The year selector appears as a navigation bar above the maps with `◀` / `▶` 
 | **Land Cover** | Total area per class per year | Forest · Cropland · Pasture · OtherLand · Urban |
 | **Outflows** | Total area lost from each class | Forest · Cropland · Pasture · OtherLand · Urban |
 | **Transitions** | Area converted between two specific classes | Forest→Cropland · Forest→Pasture · Cropland→Forest · Pasture→Cropland · OtherLand→Cropland |
+
+For **Land Cover**, each scenario tile's header also shows the FABLE Calculator's own aggregate total for that class/year, e.g. `"UP50 - Current Trends (FABLE-C: 558.29 Mha)"` — an easy way to check the downscaled map's spatial total against the Calculator's own number.
 
 ### Difference maps
 

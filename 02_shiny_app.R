@@ -66,25 +66,33 @@ default_scenarios <- if ("up" %in% names(scenario_meta) && any(!is.na(scenario_m
   available_scenarios
 }
 
-# The Maps tab needs its own default, separate from default_scenarios above:
-# the highest `up` with downscaled data isn't necessarily the highest `up`
-# overall (e.g. UP51 may exist in scenarios.csv with no downscaled data yet),
-# and a diff map only makes sense when BOTH Current Trends and NDC are
+# The Maps tab only shows switches for scenarios with downscaled LUC data on
+# disk (data/luc/downscaled_LUC_UP<up>_<ct|ndc>.rds, matched case-insensitive
+# — the provided files have used both ct/ndc and CT/NDC casing) — a switch
+# for a scenario with no data would just be a dead control that always shows
+# "Map data not available". Recomputes automatically as downscaled data is
+# added or removed, no code changes needed.
+maps_scenario_pathway <- ifelse(grepl("NDC", scenario_meta$file, ignore.case = TRUE), "ndc", "ct")
+maps_scenario_has_rds <- mapply(function(up, pw) {
+  length(list.files("data/luc",
+                    pattern = sprintf("^downscaled_LUC_UP%d_%s\\.rds$", up, pw),
+                    ignore.case = TRUE)) > 0
+}, scenario_meta$up, maps_scenario_pathway)
+maps_available_scenarios <- scenario_meta$label[maps_scenario_has_rds]
+
+# The Maps tab also needs its own default, separate from default_scenarios
+# above: the highest `up` with downscaled data isn't necessarily the highest
+# `up` overall (e.g. UP51 may exist in scenarios.csv with no downscaled data
+# yet), and a diff map only makes sense when BOTH Current Trends and NDC are
 # downscaled for the same UP. So default to the highest `up` that has both
 # pathways' downscaled .rds present — today that's UP50 — falling back to
-# default_scenarios if no UP currently has both. Recomputes automatically as
-# downscaled data is added, no code changes needed.
+# whatever of default_scenarios is actually available if no UP has both.
 maps_default_scenarios <- local({
-  pathway <- ifelse(grepl("NDC", scenario_meta$file, ignore.case = TRUE), "ndc", "ct")
-  has_rds <- mapply(function(up, pw) {
-    length(list.files("data/luc",
-                      pattern = sprintf("^downscaled_LUC_UP%d_%s\\.rds$", up, pw),
-                      ignore.case = TRUE)) > 0
-  }, scenario_meta$up, pathway)
-  complete_ups <- intersect(scenario_meta$up[pathway == "ct"  & has_rds],
-                            scenario_meta$up[pathway == "ndc" & has_rds])
-  if (length(complete_ups) == 0) return(default_scenarios)
-  scenario_meta$label[scenario_meta$up == max(complete_ups, na.rm = TRUE)]
+  complete_ups <- intersect(scenario_meta$up[maps_scenario_pathway == "ct"  & maps_scenario_has_rds],
+                            scenario_meta$up[maps_scenario_pathway == "ndc" & maps_scenario_has_rds])
+  if (length(complete_ups) > 0)
+    return(scenario_meta$label[scenario_meta$up == max(complete_ups, na.rm = TRUE)])
+  utils::head(intersect(default_scenarios, maps_available_scenarios), 2)
 })
 
 # One switch per scenario instead of a fixed-choice checkboxGroupInput — any
@@ -1933,7 +1941,7 @@ ui <- page_navbar(
         radioButtons("map_type", "Map Type",
                      choices  = c("Land Cover", "Outflows", "Transitions"),
                      selected = "Land Cover"),
-        scenario_switches_ui("maps", default_on = maps_default_scenarios),
+        scenario_switches_ui("maps", scenarios = maps_available_scenarios, default_on = maps_default_scenarios),
         tags$p("Pick up to 2 scenarios to compare.",
                style = "font-size:0.75rem; color:#666; margin-top:-8px;"),
         uiOutput("map_var_ui")
@@ -2542,13 +2550,13 @@ server <- function(input, output, session) {
   # scenario" leak in here would violate it. Cap enforced below: if a 3rd
   # switch is turned on, it's immediately reverted and the user is notified.
   MAPS_MAX_SELECTED <- 2
-  for (s in available_scenarios) {
+  for (s in maps_available_scenarios) {
     local({
       scen     <- s
       input_id <- paste0("maps_scen_", make.names(scen))
       observeEvent(input[[input_id]], {
         if (isTRUE(input[[input_id]]) &&
-            length(get_selected_scenarios_r(input, "maps")) > MAPS_MAX_SELECTED) {
+            length(get_selected_scenarios_r(input, "maps", maps_available_scenarios)) > MAPS_MAX_SELECTED) {
           update_switch(input_id, value = FALSE, session = session)
           showNotification("Only 2 scenarios can be compared at a time on the Maps tab.",
                            type = "warning", duration = 4)
@@ -2557,7 +2565,7 @@ server <- function(input, output, session) {
     })
   }
 
-  maps_scen_sel <- reactive(get_selected_scenarios_r(input, "maps"))
+  maps_scen_sel <- reactive(get_selected_scenarios_r(input, "maps", maps_available_scenarios))
 
   # Maps out a scenario label to its static-PNG folder slug, e.g.
   # "UP50 - Current Trends" -> "UP50_ct" — matches 04_generate_maps.R's own
@@ -2569,6 +2577,30 @@ server <- function(input, output, session) {
     sprintf("UP%d_%s", row$up[1], pathway)
   }
   scenario_up <- function(label) scenario_meta$up[match(label, scenario_meta$label)]
+
+  # FABLE Calculator's own aggregate total (Mha) for a land-use class/year,
+  # reusing the same landuse_map config + to_mha() the Land Use tab uses —
+  # lets the user sanity-check the downscaled map's spatial total against the
+  # Calculator's own number for that class. map_class uses "OtherLand" (no
+  # space, matching the radioButtons choices) while landuse_map's key is
+  # "Other Land" (with space, matching the Land Use tab's selectInput) — same
+  # class, different casing convention in each tab, so normalize here.
+  fable_landuse_total_mha <- function(scenario_label, map_class, year) {
+    cfg <- landuse_map[[if (map_class == "OtherLand") "Other Land" else map_class]]
+    if (is.null(cfg)) return(NA_real_)
+    row <- df_scenarios[df_scenarios$scenario == scenario_label & df_scenarios$Year == as.integer(year), ]
+    if (nrow(row) == 0) return(NA_real_)
+    to_mha(as.numeric(row[[cfg$fable_col]][1]), cfg$fable_col, cfg$fable_unit)
+  }
+
+  # Only appends the FABLE Calculator total for Land Cover (Outflows/
+  # Transitions have no single matching aggregate column to compare against).
+  maps_tile_label <- function(scenario_label, type_sel, map_class, year) {
+    if (type_sel != "Land Cover") return(scenario_label)
+    total <- fable_landuse_total_mha(scenario_label, map_class, year)
+    if (is.na(total)) return(scenario_label)
+    sprintf("%s (FABLE-C: %.2f Mha)", scenario_label, total)
+  }
 
   # Whether this scenario's downscaled LUC source file exists at all — not
   # every scenario will ever get one (e.g. some UPs won't have NDC downscaled
@@ -2639,11 +2671,11 @@ server <- function(input, output, session) {
     if (length(sel) == 0)
       return(map_placeholder("", "Select 1 or 2 scenarios", "Turn on a Scenario switch in the sidebar to see maps."))
 
-    tile1 <- tagList(tags$strong(sel[1]),
+    tile1 <- tagList(tags$strong(maps_tile_label(sel[1], type_sel, var_sel, year)),
                      make_map_img(scenario_map_dir(sel[1]), type_sel, var_sel, year,
                                  data_available = scenario_has_downscaled_data(sel[1])))
     tile2 <- if (length(sel) >= 2) {
-      tagList(tags$strong(sel[2]),
+      tagList(tags$strong(maps_tile_label(sel[2], type_sel, var_sel, year)),
              make_map_img(scenario_map_dir(sel[2]), type_sel, var_sel, year,
                          data_available = scenario_has_downscaled_data(sel[2])))
     } else {
