@@ -4,26 +4,32 @@
 # =============================================================================
 #
 # Usage:
-#   Rscript 04_generate_maps.R          # both scenarios + difference
-#   Rscript 04_generate_maps.R ct       # Current Trends only + difference
-#   Rscript 04_generate_maps.R ndc      # NDC Commitments only + difference
+#   Rscript 04_generate_maps.R                      # every scenario with downscaled data + all diffs
+#   Rscript 04_generate_maps.R "UP50 - Current Trends"   # one scenario (label from scenarios.csv) + all diffs
+#   Rscript 04_generate_maps.R diff                 # diffs only, skip scenario maps
+#
+# Scenarios are discovered from data/xlsx/scenarios.csv — a scenario is
+# processed only if its downscaled LUC file exists on disk:
+#   data/luc/downscaled_LUC_UP<up>_<ct|ndc>.rds
+# (<ct|ndc> derived from whether the scenario's xlsx filename contains "NDC").
+# Adding a new UP's downscaled data later needs no code changes here — the
+# next run just picks it up. A difference map is generated for a given UP
+# only when BOTH its Current Trends and NDC downscaled files exist.
 #
 # Input:
-#   data/luc/downscaled_LUC_UP50_ct.rds
-#   data/luc/downscaled_LUC_UP50_ndc.rds
+#   data/luc/downscaled_LUC_UP<n>_ct.rds / _ndc.rds  (one pair per UP that has them)
 #   data/luc/id_raster.tif
 #   data/shapefiles/br_states.shp
 #   data/shapefiles/br_biomes.shp
 #
 # Output:
-#   data/maps/ct/landcover/    landcover_<Class>_<year>.png
-#   data/maps/ct/transitions/  outflow_<Class>_<year>.png
-#                              transition_<From>_to_<To>_<year>.png
-#   data/maps/ndc/landcover/
-#   data/maps/ndc/transitions/
-#   data/maps/diff/landcover/  landcover_<Class>_<year>.png  (NDC - CT, diverging)
-#   data/maps/diff/transitions/ outflow_<Class>_<year>.png
-#                               transition_<From>_to_<To>_<year>.png
+#   data/maps/UP<n>_ct/landcover/    landcover_<Class>_<year>.png
+#   data/maps/UP<n>_ct/transitions/  outflow_<Class>_<year>.png
+#                                    transition_<From>_to_<To>_<year>.png
+#   data/maps/UP<n>_ndc/landcover/, /transitions/          (same shape)
+#   data/maps/diff/UP<n>/landcover/  landcover_<Class>_<year>.png  (NDC - CT, diverging)
+#   data/maps/diff/UP<n>/transitions/ outflow_<Class>_<year>.png
+#                                     transition_<From>_to_<To>_<year>.png
 #
 # Required packages:
 #   install.packages(c("terra", "dplyr", "RColorBrewer"))
@@ -37,29 +43,53 @@ library(RColorBrewer)
 # 0.  Configuration
 # =============================================================================
 
-scenarios <- list(
-  ct = list(
-    rds     = "data/luc/downscaled_LUC_UP50_ct.rds",
-    dir_out = "data/maps/ct",
-    label   = "Current Trends"
-  ),
-  ndc = list(
-    rds     = "data/luc/downscaled_LUC_UP50_ndc.rds",
-    dir_out = "data/maps/ndc",
-    label   = "NDC Commitments"
-  )
+# ── Discover scenarios with downscaled LUC data ───────────────────────────────
+# Matched case-insensitively (list.files(ignore.case=TRUE)) rather than a
+# hardcoded-case sprintf() path — the person providing these .rds files has
+# used both "ct"/"ndc" and "CT"/"NDC" naming at different times, and this
+# also keeps the script portable to the case-sensitive Mac/Ubuntu launchers.
+find_downscaled_rds <- function(up, pathway) {
+  files <- list.files("data/luc",
+                      pattern    = sprintf("^downscaled_LUC_UP%d_%s\\.rds$", up, pathway),
+                      full.names = TRUE, ignore.case = TRUE)
+  if (length(files) == 0) NA_character_ else files[1]
+}
+
+scenario_meta <- read.csv("data/xlsx/scenarios.csv", stringsAsFactors = FALSE)
+scenario_meta$pathway <- ifelse(grepl("NDC", scenario_meta$file, ignore.case = TRUE), "ndc", "ct")
+scenario_meta$rds     <- mapply(find_downscaled_rds, scenario_meta$up, scenario_meta$pathway)
+scenario_meta$dir_out <- sprintf("data/maps/UP%d_%s", scenario_meta$up, scenario_meta$pathway)
+
+available_meta <- scenario_meta[!is.na(scenario_meta$rds), ]
+if (nrow(available_meta) == 0)
+  stop("No scenarios have downscaled LUC data yet (data/luc/downscaled_LUC_UP<n>_<ct|ndc>.rds not found for any scenario in scenarios.csv).")
+
+scenarios <- setNames(
+  lapply(seq_len(nrow(available_meta)), function(i) {
+    list(rds = available_meta$rds[i], dir_out = available_meta$dir_out[i], label = available_meta$label[i])
+  }),
+  sprintf("UP%d_%s", available_meta$up, available_meta$pathway)
 )
+
+cat("Scenarios with downscaled data:", paste(names(scenarios), collapse = ", "), "\n")
+missing_meta <- scenario_meta[is.na(scenario_meta$rds), ]
+if (nrow(missing_meta) > 0)
+  cat("Skipping (no downscaled data yet):", paste(missing_meta$label, collapse = ", "), "\n")
 
 args <- commandArgs(trailingOnly = TRUE)
 diff_only <- FALSE
 if (length(args) > 0) {
-  arg <- tolower(trimws(args[1]))
-  if (arg == "diff") {
+  arg <- trimws(args[1])
+  if (tolower(arg) == "diff") {
     diff_only <- TRUE
-  } else if (arg %in% names(scenarios)) {
-    scenarios <- scenarios[arg]
   } else {
-    stop("Unknown argument '", arg, "'. Use: ct | ndc | diff")
+    match_label <- available_meta$label[tolower(available_meta$label) == tolower(arg)]
+    if (length(match_label) == 1) {
+      key <- names(scenarios)[sapply(scenarios, function(s) s$label == match_label)]
+      scenarios <- scenarios[key]
+    } else {
+      stop("Unknown argument '", arg, "'. Use: diff | a scenario label from scenarios.csv (with downscaled data), e.g. \"UP50 - Current Trends\"")
+    }
   }
 }
 
@@ -235,7 +265,7 @@ run_scenario <- function(sc) {
 }
 
 # =============================================================================
-# 4.  Difference maps (NDC - CT)
+# 4.  Difference maps (NDC - CT), one per UP that has both pathways downscaled
 # =============================================================================
 
 load_luc <- function(rds_path) {
@@ -249,19 +279,19 @@ load_luc <- function(rds_path) {
     )
 }
 
-run_diff <- function() {
+run_diff_for_up <- function(up, ct_rds, ndc_rds) {
 
+  dir_diff <- sprintf("data/maps/diff/UP%d", up)
   cat("\n============================================================\n")
-  cat(" Difference maps (NDC - CT)\n")
-  cat(" Output:   data/maps/diff\n")
+  cat(" Difference maps (NDC - CT), UP", up, "\n")
+  cat(" Output:  ", dir_diff, "\n")
   cat("============================================================\n")
 
-  dir_diff <- "data/maps/diff"
   dir.create(file.path(dir_diff, "landcover"),   showWarnings = FALSE, recursive = TRUE)
   dir.create(file.path(dir_diff, "transitions"), showWarnings = FALSE, recursive = TRUE)
 
-  luc_ct  <- load_luc("data/luc/downscaled_LUC_UP50_ct.rds")
-  luc_ndc <- load_luc("data/luc/downscaled_LUC_UP50_ndc.rds")
+  luc_ct  <- load_luc(ct_rds)
+  luc_ndc <- load_luc(ndc_rds)
 
   years <- sort(unique(luc_ct$year))
 
@@ -345,7 +375,21 @@ run_diff <- function() {
     }
   }
 
-  cat("\nDifference maps done.\n")
+  cat("\nDifference maps for UP", up, "done.\n")
+}
+
+run_diff <- function() {
+  ups <- sort(unique(available_meta$up))
+  for (up in ups) {
+    rows <- available_meta[available_meta$up == up, ]
+    ct_row  <- rows[rows$pathway == "ct", ]
+    ndc_row <- rows[rows$pathway == "ndc", ]
+    if (nrow(ct_row) == 1 && nrow(ndc_row) == 1) {
+      run_diff_for_up(up, ct_row$rds[1], ndc_row$rds[1])
+    } else {
+      cat("\nSkipping diff for UP", up, "— needs both Current Trends and NDC downscaled data.\n")
+    }
+  }
 }
 
 # =============================================================================
@@ -356,4 +400,3 @@ if (!diff_only) for (sc in scenarios) run_scenario(sc)
 run_diff()
 
 cat("\nAll done.\n")
-

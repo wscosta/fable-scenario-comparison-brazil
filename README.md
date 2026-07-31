@@ -67,12 +67,11 @@ All three launchers auto-detect their own location and open the browser automati
 | Scenario metadata | `data/xlsx/scenarios.csv` | Maps each xlsx file to its display label — the single source of truth for which scenarios exist and in what order (see [🗂️ Managing scenarios](#️-managing-scenarios)) |
 | FABLE Calculator spreadsheet(s) | `data/xlsx/` | One `.xlsx` per scenario listed in `scenarios.csv` |
 | Historical reference data | `data/csv/` | Long-format CSV (`histdatabrazil.csv`) with observed data for Brazil |
-| LUC transition matrix — CT | `data/luc/` | Downscaled land-use change data for Current Trends (`downscaled_LUC_UP50_ct.rds`) |
-| LUC transition matrix — NDC | `data/luc/` | Downscaled land-use change data for NDC Commitments (`downscaled_LUC_UP50_ndc.rds`) |
+| LUC transition matrix | `data/luc/` | Downscaled land-use change data per scenario, `downscaled_LUC_UP<n>_<ct|ndc>.rds` (matched case-insensitively — `ct`/`ndc` or `CT`/`NDC` both work) — exists for UP50 (both pathways), UP48 and UP46 (Current Trends only) |
 | Cell ID raster | `data/luc/` | `id_raster.tif` — maps FABLE cell IDs to a 0.05° raster grid |
 | State and biome boundaries | `data/shapefiles/` | `br_states.shp`, `br_biomes.shp` — shapefile overlays for maps |
 
-> ⚠️ **Not yet scenario-generic:** the Maps tab (Land Cover / Outflows / Transitions) still only knows about a fixed `ct`/`ndc` pair, independent of what's in `scenarios.csv` — it doesn't pick up UP48, or any other scenario added since. This is planned for a future update; see [🌎 Shiny app — Maps tab](#-shiny-app--maps-tab) below for the current, unchanged behaviour.
+> ⚠️ **Maps data availability lags the other tabs:** the Maps tab now lets you pick any 2 scenarios from `scenarios.csv` (capped at 2, see [🌎 Shiny app — Maps tab](#-shiny-app--maps-tab)), but downscaled raster data currently only exists for UP50 (both pathways), UP48, and UP46 (Current Trends only for the latter two) — other scenarios/pathways (e.g. UP51, or an NDC that may never get downscaled data) show a "Map data not available" placeholder rather than the actionable "not generated yet" one, since simply rerunning `04_generate_maps.R` can't produce data that doesn't exist.
 
 ## 🗂️ Managing scenarios
 
@@ -111,12 +110,16 @@ fable-scenario-comparison-brazil/
 │   │   ├── downscaled_LUC_UP50_ndc.rds      # LUC transition matrix — NDC Commitments
 │   │   └── id_raster.tif                    # Cell ID raster (0.05° resolution)
 │   ├── maps/                                # Auto-generated PNGs (gitignored)
-│   │   ├── ct/
+│   │   ├── UP50_ct/
 │   │   │   ├── landcover/
 │   │   │   └── transitions/
-│   │   └── ndc/
-│   │       ├── landcover/
-│   │       └── transitions/
+│   │   ├── UP50_ndc/
+│   │   │   ├── landcover/
+│   │   │   └── transitions/
+│   │   └── diff/
+│   │       └── UP50/
+│   │           ├── landcover/
+│   │           └── transitions/
 │   ├── shapefiles/
 │   │   ├── br_states.shp                    # Brazilian state boundaries
 │   │   └── br_biomes.shp                    # Brazilian biome boundaries
@@ -448,17 +451,18 @@ Cattle Herd now has a historical series (IBGE) and shows the full Calibration-mo
 
 ## 🌎 Shiny app — Maps tab
 
-> ⚠️ **Still hardcoded to the original Current Trends / NDC Commitments pair — not yet updated for the `scenarios.csv`-driven multi-scenario setup used by the other 7 tabs (Land Use, Land Use Change, Emissions, Crops, Livestock, Trade, Food).** Adding UP48 (or any other scenario) has no effect here; this tab keeps showing the same `ct`/`ndc` pair regardless of what's active elsewhere. Bringing it in line — reading scenarios from `scenarios.csv`, generalizing the "Difference" column beyond a single pair — is planned for a near-term follow-up, not done in this pass.
-
-Displays static PNG maps generated from the FABLE downscaling model for both scenarios side by side.
+Displays static PNG maps generated from the FABLE downscaling model. Like the other tabs, scenarios are picked via switches from `scenarios.csv` — but **capped at exactly 2 selected at once**, since this tab shows a left/right pair plus a difference map (a diff only makes sense between 2 scenarios). Turning on a 3rd switch reverts it automatically with a short notice. These switches are independent of every other tab's — toggling a scenario here doesn't affect (and isn't affected by) Land Use, Emissions, etc. **Defaults to whichever UP calibration currently has both Current Trends and NDC downscaled (today, UP50)** rather than the newest UP overall, so the tab opens showing real maps instead of "not available" placeholders.
 
 | Control | Options |
 |---------|---------|
 | **Map Type** | Land Cover · Outflows · Transitions |
+| **Scenario** | Any 2 scenarios from `scenarios.csv` (switches, capped at 2) |
 | **Class / Transition** | Depends on Map Type (see below) |
 | **Year** | 2020 · 2025 · 2030 · 2035 · 2040 · 2045 · 2050 |
 
-The year selector appears as a navigation bar above the maps with `◀` / `▶` arrow buttons. Three maps are shown side by side — **Current Trends**, **NDC Commitments**, and **Difference (NDC − CT)**. Images are sized to fit the browser viewport without scrolling.
+The year selector appears as a navigation bar above the maps with `◀` / `▶` arrow buttons. Up to 3 tiles are shown side by side — the 2 selected scenarios' maps, and a **Difference** map. Images are sized to fit the browser viewport without scrolling.
+
+> ⚠️ **Downscaled map data currently exists for UP50 (both pathways), UP48, and UP46 (Current Trends only for the latter two).** Selecting a scenario without downscaled data shows a **"Map data not available"** placeholder — distinct from the "maps not generated yet, run `04_generate_maps.R`" message, since some scenarios (e.g. an NDC pathway for a given UP) may never get downscaled data at all, and the script can't fix that.
 
 ### Map types
 
@@ -470,17 +474,16 @@ The year selector appears as a navigation bar above the maps with `◀` / `▶` 
 
 ### Difference maps
 
-The Difference column shows **NDC − CT** using a diverging **RdBu** colour scale (±310 × 1 000 ha): blue cells indicate NDC has more area, red cells indicate NDC has less. When the two scenarios are identical for a given variable and year, the app shows a "No difference" placeholder instead of a blank or misleading map.
+Only computed between 2 scenarios of the **same UP calibration** — uses a diverging **RdBu** colour scale (±310 × 1 000 ha): blue cells indicate the second scenario has more area, red cells indicate less. When the two scenarios are identical for a given variable and year, the app shows a "No difference" placeholder. **Comparing scenarios across different UP calibrations (e.g. UP51 vs UP50) isn't supported yet** — the Difference tile shows a distinct "not available yet" message instead, planned for a future update.
 
 ### Generating maps
 
-Maps are generated by `04_generate_maps.R` and saved to `data/maps/` (gitignored). The launchers regenerate them automatically on first run. To regenerate manually:
+Maps are generated by `04_generate_maps.R` and saved to `data/maps/` (gitignored) as `data/maps/UP<n>_ct/`, `data/maps/UP<n>_ndc/`, `data/maps/diff/UP<n>/`. Scenarios are discovered from `scenarios.csv` — only those with a matching downscaled file (`data/luc/downscaled_LUC_UP<n>_<ct|ndc>.rds`) are processed; adding a new UP's downscaled data later needs no code changes, just rerun the script. The launchers regenerate maps automatically on first run. To regenerate manually:
 
 ```bash
-Rscript 04_generate_maps.R          # both scenarios + difference
-Rscript 04_generate_maps.R ct       # Current Trends only + difference
-Rscript 04_generate_maps.R ndc      # NDC Commitments only + difference
-Rscript 04_generate_maps.R diff     # difference maps only (fastest)
+Rscript 04_generate_maps.R                        # every scenario with downscaled data + all same-UP diffs
+Rscript 04_generate_maps.R "UP50 - Current Trends"  # one scenario by its scenarios.csv label + diffs
+Rscript 04_generate_maps.R diff                   # diffs only (fastest)
 ```
 
 > Interactive (Leaflet-based) maps are planned for a future branch (`downscaling-dynamic`).

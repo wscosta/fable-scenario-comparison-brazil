@@ -66,6 +66,27 @@ default_scenarios <- if ("up" %in% names(scenario_meta) && any(!is.na(scenario_m
   available_scenarios
 }
 
+# The Maps tab needs its own default, separate from default_scenarios above:
+# the highest `up` with downscaled data isn't necessarily the highest `up`
+# overall (e.g. UP51 may exist in scenarios.csv with no downscaled data yet),
+# and a diff map only makes sense when BOTH Current Trends and NDC are
+# downscaled for the same UP. So default to the highest `up` that has both
+# pathways' downscaled .rds present — today that's UP50 — falling back to
+# default_scenarios if no UP currently has both. Recomputes automatically as
+# downscaled data is added, no code changes needed.
+maps_default_scenarios <- local({
+  pathway <- ifelse(grepl("NDC", scenario_meta$file, ignore.case = TRUE), "ndc", "ct")
+  has_rds <- mapply(function(up, pw) {
+    length(list.files("data/luc",
+                      pattern = sprintf("^downscaled_LUC_UP%d_%s\\.rds$", up, pw),
+                      ignore.case = TRUE)) > 0
+  }, scenario_meta$up, pathway)
+  complete_ups <- intersect(scenario_meta$up[pathway == "ct"  & has_rds],
+                            scenario_meta$up[pathway == "ndc" & has_rds])
+  if (length(complete_ups) == 0) return(default_scenarios)
+  scenario_meta$label[scenario_meta$up == max(complete_ups, na.rm = TRUE)]
+})
+
 # One switch per scenario instead of a fixed-choice checkboxGroupInput — any
 # number of scenarios can be selected at once, same pattern as the sister
 # MAgPIE app's scenario_switches_ui()/get_selected_scenarios_r().
@@ -1912,6 +1933,9 @@ ui <- page_navbar(
         radioButtons("map_type", "Map Type",
                      choices  = c("Land Cover", "Outflows", "Transitions"),
                      selected = "Land Cover"),
+        scenario_switches_ui("maps", default_on = maps_default_scenarios),
+        tags$p("Pick up to 2 scenarios to compare.",
+               style = "font-size:0.75rem; color:#666; margin-top:-8px;"),
         uiOutput("map_var_ui")
       ),
       tagList(
@@ -2511,7 +2535,68 @@ server <- function(input, output, session) {
     }
   })
 
-  make_map_img <- function(sc_dir, type_sel, var_sel, year) {
+  # Maps' own scenario switches are deliberately NOT part of the shared
+  # cross-tab scenario_state/SCENARIO_TAB_PREFIXES sync — this tab's static
+  # PNG pipeline structurally assumes at most a left/right pair + a diff, a
+  # constraint no other tab has, so letting another tab's "check a 3rd
+  # scenario" leak in here would violate it. Cap enforced below: if a 3rd
+  # switch is turned on, it's immediately reverted and the user is notified.
+  MAPS_MAX_SELECTED <- 2
+  for (s in available_scenarios) {
+    local({
+      scen     <- s
+      input_id <- paste0("maps_scen_", make.names(scen))
+      observeEvent(input[[input_id]], {
+        if (isTRUE(input[[input_id]]) &&
+            length(get_selected_scenarios_r(input, "maps")) > MAPS_MAX_SELECTED) {
+          update_switch(input_id, value = FALSE, session = session)
+          showNotification("Only 2 scenarios can be compared at a time on the Maps tab.",
+                           type = "warning", duration = 4)
+        }
+      }, ignoreInit = TRUE)
+    })
+  }
+
+  maps_scen_sel <- reactive(get_selected_scenarios_r(input, "maps"))
+
+  # Maps out a scenario label to its static-PNG folder slug, e.g.
+  # "UP50 - Current Trends" -> "UP50_ct" — matches 04_generate_maps.R's own
+  # dir_out naming (derived the same way: up column + NDC-in-filename check).
+  scenario_map_dir <- function(label) {
+    row <- scenario_meta[scenario_meta$label == label, ]
+    if (nrow(row) == 0) return(NA_character_)
+    pathway <- if (grepl("NDC", row$file[1], ignore.case = TRUE)) "ndc" else "ct"
+    sprintf("UP%d_%s", row$up[1], pathway)
+  }
+  scenario_up <- function(label) scenario_meta$up[match(label, scenario_meta$label)]
+
+  # Whether this scenario's downscaled LUC source file exists at all — not
+  # every scenario will ever get one (e.g. some UPs won't have NDC downscaled
+  # data), so this is checked separately from "the PNG for this specific
+  # class/year just hasn't been rendered yet" to give a more honest message
+  # ("data not available" vs. the actionable "run 04_generate_maps.R").
+  # Matched case-insensitively (same as 04_generate_maps.R's own
+  # find_downscaled_rds()) since the provided .rds files have used both
+  # "ct"/"ndc" and "CT"/"NDC" naming at different times.
+  scenario_has_downscaled_data <- function(label) {
+    length(list.files("data/luc",
+                      pattern = sprintf("^downscaled_LUC_%s\\.rds$", scenario_map_dir(label)),
+                      ignore.case = TRUE)) > 0
+  }
+
+  map_placeholder <- function(icon_html, title_text, subtitle) {
+    div(style = paste("display:flex; flex-direction:column; align-items:center;",
+                      "justify-content:center;",
+                      "aspect-ratio:820/780; width:100%; max-height:calc(100vh - 210px);",
+                      "border:1px solid #ddd; border-radius:4px;",
+                      "background:white; color:#555;",
+                      "font-size:0.9rem; text-align:center; padding:1rem;"),
+        tags$div(style = "font-size:2.2rem; margin-bottom:0.4rem;", HTML(icon_html)),
+        tags$p(style = "margin:0; font-weight:600;", title_text),
+        tags$p(style = "margin:0.25rem 0 0 0; font-size:0.8rem; color:#888;", subtitle))
+  }
+
+  make_map_img <- function(sc_dir, type_sel, var_sel, year, data_available = TRUE) {
     if (type_sel == "Land Cover") {
       rel_path <- sprintf("maps/%s/landcover/landcover_%s_%s.png", sc_dir, var_sel, year)
     } else if (type_sel == "Outflows") {
@@ -2522,28 +2607,20 @@ server <- function(input, output, session) {
     }
     disk_path    <- paste0("data/", rel_path)
     nodiff_path  <- sub("\\.png$", ".nodiff", disk_path)
-    if (sc_dir == "diff" && file.exists(nodiff_path)) {
-      div(style = paste("display:flex; flex-direction:column; align-items:center;",
-                        "justify-content:center;",
-                        "aspect-ratio:820/780; width:100%; max-height:calc(100vh - 210px);",
-                        "border:1px solid #ddd; border-radius:4px;",
-                        "background:white; color:#555;",
-                        "font-size:0.9rem; text-align:center; padding:1rem;"),
-          tags$div(style = "font-size:2.2rem; margin-bottom:0.4rem;", HTML("&#x2261;")),
-          tags$p(style = "margin:0; font-weight:600;", "No difference"),
-          tags$p(style = "margin:0.25rem 0 0 0; font-size:0.8rem; color:#888;",
-                 "CT and NDC are identical for this variable and year."))
+    if (startsWith(sc_dir, "diff/") && file.exists(nodiff_path)) {
+      map_placeholder("&#x2261;", "No difference",
+                      "Both scenarios are identical for this variable and year.")
     } else if (file.exists(disk_path)) {
       tags$img(src   = rel_path,
                class = "maps-img",
                style = "border:1px solid #ddd; border-radius:4px;",
                alt   = paste(sc_dir, type_sel, var_sel, year))
+    } else if (!data_available) {
+      map_placeholder("&#x1F6AB;", "Map data not available",
+                      "Downscaled data for this scenario doesn't exist yet.")
     } else {
-      div(style = paste("display:flex; align-items:center; justify-content:center;",
-                        "height:300px; border:1px dashed #bbb; border-radius:4px;",
-                        "background:#f8f8f8; color:#888; font-size:0.85rem; text-align:center; padding:1rem;"),
-          tags$p("Maps not generated yet.", tags$br(),
-                 tags$code("Rscript 04_generate_maps.R")))
+      map_placeholder("", "Maps not generated yet.",
+                      HTML(as.character(tags$code("Rscript 04_generate_maps.R"))))
     }
   }
 
@@ -2557,10 +2634,45 @@ server <- function(input, output, session) {
       req(input$map_class)
       input$map_class
     }
+
+    sel <- maps_scen_sel()
+    if (length(sel) == 0)
+      return(map_placeholder("", "Select 1 or 2 scenarios", "Turn on a Scenario switch in the sidebar to see maps."))
+
+    tile1 <- tagList(tags$strong(sel[1]),
+                     make_map_img(scenario_map_dir(sel[1]), type_sel, var_sel, year,
+                                 data_available = scenario_has_downscaled_data(sel[1])))
+    tile2 <- if (length(sel) >= 2) {
+      tagList(tags$strong(sel[2]),
+             make_map_img(scenario_map_dir(sel[2]), type_sel, var_sel, year,
+                         data_available = scenario_has_downscaled_data(sel[2])))
+    } else {
+      tagList(tags$strong(""), map_placeholder("", "Select a second scenario",
+                                                "Turn on another Scenario switch to compare."))
+    }
+    diff_tile <- if (length(sel) >= 2) {
+      up1 <- scenario_up(sel[1]); up2 <- scenario_up(sel[2])
+      both_available <- scenario_has_downscaled_data(sel[1]) && scenario_has_downscaled_data(sel[2])
+      if (!identical(up1, up2)) {
+        tagList(tags$strong("Difference"),
+                map_placeholder("&#x1F6A7;", "Not available yet",
+                                "Difference maps between different UP calibrations aren't supported yet — planned for a future update."))
+      } else if (!both_available) {
+        tagList(tags$strong("Difference"),
+                map_placeholder("&#x1F6AB;", "Map data not available",
+                                "Downscaled data is missing for one or both selected scenarios."))
+      } else {
+        tagList(tags$strong("Difference"), make_map_img(sprintf("diff/UP%d", up1), type_sel, var_sel, year))
+      }
+    } else {
+      tagList(tags$strong("Difference"),
+              map_placeholder("", "Select 2 scenarios", "A difference map needs exactly 2 scenarios selected."))
+    }
+
     fluidRow(
-      column(4, make_map_img("ct",   type_sel, var_sel, year)),
-      column(4, make_map_img("ndc",  type_sel, var_sel, year)),
-      column(4, make_map_img("diff", type_sel, var_sel, year))
+      column(4, tile1),
+      column(4, tile2),
+      column(4, diff_tile)
     )
   })
 
