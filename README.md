@@ -6,10 +6,12 @@ An interactive R Shiny app to compare any number of [FABLE Calculator](https://f
 
 The FABLE Calculator is a spreadsheet-based land-use modelling tool developed by the FABLE Consortium to explore national pathways toward sustainable food and land-use systems. This project reads any number of Brazil-specific scenario files (configured in `data/xlsx/scenarios.csv`) and overlays their outputs with historical reference data (2000–2020), enabling visual comparison across land-use classes and time periods.
 
-The app ships with seven scenarios across four calibrations (UP51, UP50, UP48, UP46) — UP51/UP50/UP48 each with both pathways, UP46 currently only with Current Trends:
+The app ships with nine scenarios across five calibrations (UP51a, UP51, UP50, UP48, UP46) — UP51a/UP51/UP50/UP48 each with both pathways, UP46 currently only with Current Trends. UP51a is a revised UP51 with an updated land-use baseline (Mapbiomas Collection 10 + IBGE):
 
 | Scenario | Description |
 |----------|-------------|
+| **UP51a - Current Trends** | Business-as-usual trajectory, UP51a calibration (revised land-use baseline) |
+| **UP51a - NDC Commitments** | Nationally Determined Contribution targets, UP51a calibration (revised land-use baseline) |
 | **UP51 - Current Trends** | Business-as-usual trajectory, UP51 calibration |
 | **UP51 - NDC Commitments** | Nationally Determined Contribution targets, UP51 calibration |
 | **UP50 - Current Trends** | Business-as-usual trajectory, UP50 calibration |
@@ -71,7 +73,7 @@ All three launchers auto-detect their own location and open the browser automati
 | Cell ID raster | `data/luc/` | `id_raster.tif` — maps FABLE cell IDs to a 0.05° raster grid |
 | State and biome boundaries | `data/shapefiles/` | `br_states.shp`, `br_biomes.shp` — shapefile overlays for maps |
 
-> ⚠️ **Maps data availability lags the other tabs:** the Maps tab now lets you pick any 2 scenarios from `scenarios.csv` (capped at 2, see [🌎 Shiny app — Maps tab](#-shiny-app--maps-tab)), but downscaled raster data currently only exists for UP50 (both pathways), UP48, and UP46 (Current Trends only for the latter two) — other scenarios/pathways (e.g. UP51, or an NDC that may never get downscaled data) show a "Map data not available" placeholder rather than the actionable "not generated yet" one, since simply rerunning `04_generate_maps.R` can't produce data that doesn't exist.
+> ⚠️ **Maps data availability lags the other tabs:** the Maps tab now lets you pick any 2 scenarios from `scenarios.csv` (capped at 2, see [🌎 Shiny app — Maps tab](#-shiny-app--maps-tab)), but downscaled raster data currently only exists for UP51a (both pathways), UP50 (both pathways), UP48, and UP46 (Current Trends only for the latter two) — other scenarios/pathways (e.g. plain UP51, or an NDC that may never get downscaled data) show a "Map data not available" placeholder rather than the actionable "not generated yet" one, since simply rerunning `04_generate_maps.R` can't produce data that doesn't exist.
 
 ## 🗂️ Managing scenarios
 
@@ -79,6 +81,8 @@ All three launchers auto-detect their own location and open the browser automati
 
 ```csv
 file,label,up
+FABLECalculator_BRA_UP51a_CurrentTrends.xlsx,UP51a - Current Trends,51.1
+FABLECalculator_BRA_UP51a_NDC.xlsx,UP51a - NDC Commitments,51.1
 FABLECalculator_BRA_UP51_CurrentTrends.xlsx,UP51 - Current Trends,51
 FABLECalculator_BRA_UP51_NDC.xlsx,UP51 - NDC Commitments,51
 FABLECalculator_BRA_UP50_CurrentTrends.xlsx,UP50 - Current Trends,50
@@ -90,7 +94,7 @@ FABLECalculator_BRA_UP46_CurrentTrends.xlsx,UP46 - Current Trends,46
 
 **To add a scenario:** drop the new `.xlsx` file into `data/xlsx/` and add a row to `scenarios.csv` with its filename and display label. The app detects the change automatically on next launch and reprocesses if needed — no need to delete `data/processed/` by hand, though doing so also works. This also covers **editing an existing scenario's xlsx in place** (same filename/label, just corrected data) — the app compares each source file's modification time against the cache and reprocesses if any xlsx, `scenarios.csv`, or `histdatabrazil.csv` is newer. Any number of scenarios can be selected at once via the **Scenario** switches on each tab.
 
-**Default-on scenarios:** the optional `up` column controls which switches start checked — only the rows with the *highest* `up` value default to on (currently the two UP51 rows); everything else starts off but is still selectable. Adding a new, higher-numbered UP row automatically becomes the new default the next time the app launches, no code changes needed. Omitting the `up` column entirely makes every scenario default to checked.
+**Default-on scenarios:** the optional `up` column controls which switches start checked — only the rows with the *highest* `up` value default to on (currently the two UP51a rows); everything else starts off but is still selectable. Adding a new, higher-numbered UP row automatically becomes the new default the next time the app launches, no code changes needed. Omitting the `up` column entirely makes every scenario default to checked. `up` doesn't need to be a whole number — a revised calibration that supersedes an existing UP (like UP51a superseding UP51) can use a decimal (`51.1`) to rank above it without colliding.
 
 **Switches stay in sync across tabs:** toggling a scenario on or off on any tab (Land Use, Land Use Change, Emissions, Crops, Livestock, Trade, Food) applies the same change everywhere else — there's one shared selection, not seven independent ones.
 
@@ -462,7 +466,7 @@ Displays static PNG maps generated from the FABLE downscaling model. Like the ot
 
 The year selector appears as a navigation bar above the maps with `◀` / `▶` arrow buttons. Up to 3 tiles are shown side by side — the 2 selected scenarios' maps, and a **Difference** map. Images are sized to fit the browser viewport without scrolling.
 
-> ⚠️ **Downscaled map data currently exists for UP50 (both pathways), UP48, and UP46 (Current Trends only for the latter two).** Selecting a scenario without downscaled data shows a **"Map data not available"** placeholder — distinct from the "maps not generated yet, run `04_generate_maps.R`" message, since some scenarios (e.g. an NDC pathway for a given UP) may never get downscaled data at all, and the script can't fix that.
+> ⚠️ **Downscaled map data currently exists for UP51a (both pathways), UP50 (both pathways), UP48, and UP46 (Current Trends only for the latter two).** Selecting a scenario without downscaled data shows a **"Map data not available"** placeholder — distinct from the "maps not generated yet, run `04_generate_maps.R`" message, since some scenarios (e.g. an NDC pathway for a given UP) may never get downscaled data at all, and the script can't fix that.
 
 ### Map types
 

@@ -44,31 +44,44 @@ library(RColorBrewer)
 # =============================================================================
 
 # ── Discover scenarios with downscaled LUC data ───────────────────────────────
-# Matched case-insensitively (list.files(ignore.case=TRUE)) rather than a
-# hardcoded-case sprintf() path — the person providing these .rds files has
-# used both "ct"/"ndc" and "CT"/"NDC" naming at different times, and this
-# also keeps the script portable to the case-sensitive Mac/Ubuntu launchers.
-find_downscaled_rds <- function(up, pathway) {
+# The UP token used for file/folder naming is read directly off the xlsx
+# filename (e.g. "UP51a" out of "FABLECalculator_BRA_UP51a_NDC.xlsx"), not
+# reconstructed from the numeric `up` column via sprintf("UP%d", ...) — `up`
+# may not be a clean integer forever (e.g. "UP51a", a revised UP51 with
+# updated Mapbiomas/IBGE land-use data, alongside the original UP51), and
+# %d would error on a non-integer value. `up` itself stays purely numeric,
+# used only for "which calibration is newest" (run_diff()'s per-UP pairing
+# below) — never for path construction.
+#
+# rds paths are matched case-insensitively (list.files(ignore.case=TRUE))
+# rather than a hardcoded-case sprintf() path — the person providing these
+# .rds files has used both "ct"/"ndc" and "CT"/"NDC" naming at different
+# times, and this also keeps the script portable to the case-sensitive
+# Mac/Ubuntu launchers.
+scenario_up_token <- function(file) sub(".*_(UP[0-9]+[A-Za-z]*)_.*", "\\1", file)
+
+find_downscaled_rds <- function(up_token, pathway) {
   files <- list.files("data/luc",
-                      pattern    = sprintf("^downscaled_LUC_UP%d_%s\\.rds$", up, pathway),
+                      pattern    = sprintf("^downscaled_LUC_%s_%s\\.rds$", up_token, pathway),
                       full.names = TRUE, ignore.case = TRUE)
   if (length(files) == 0) NA_character_ else files[1]
 }
 
 scenario_meta <- read.csv("data/xlsx/scenarios.csv", stringsAsFactors = FALSE)
-scenario_meta$pathway <- ifelse(grepl("NDC", scenario_meta$file, ignore.case = TRUE), "ndc", "ct")
-scenario_meta$rds     <- mapply(find_downscaled_rds, scenario_meta$up, scenario_meta$pathway)
-scenario_meta$dir_out <- sprintf("data/maps/UP%d_%s", scenario_meta$up, scenario_meta$pathway)
+scenario_meta$up_token <- vapply(scenario_meta$file, scenario_up_token, character(1))
+scenario_meta$pathway  <- ifelse(grepl("NDC", scenario_meta$file, ignore.case = TRUE), "ndc", "ct")
+scenario_meta$rds      <- mapply(find_downscaled_rds, scenario_meta$up_token, scenario_meta$pathway)
+scenario_meta$dir_out  <- sprintf("data/maps/%s_%s", scenario_meta$up_token, scenario_meta$pathway)
 
 available_meta <- scenario_meta[!is.na(scenario_meta$rds), ]
 if (nrow(available_meta) == 0)
-  stop("No scenarios have downscaled LUC data yet (data/luc/downscaled_LUC_UP<n>_<ct|ndc>.rds not found for any scenario in scenarios.csv).")
+  stop("No scenarios have downscaled LUC data yet (data/luc/downscaled_LUC_<UPtoken>_<ct|ndc>.rds not found for any scenario in scenarios.csv).")
 
 scenarios <- setNames(
   lapply(seq_len(nrow(available_meta)), function(i) {
     list(rds = available_meta$rds[i], dir_out = available_meta$dir_out[i], label = available_meta$label[i])
   }),
-  sprintf("UP%d_%s", available_meta$up, available_meta$pathway)
+  sprintf("%s_%s", available_meta$up_token, available_meta$pathway)
 )
 
 cat("Scenarios with downscaled data:", paste(names(scenarios), collapse = ", "), "\n")
@@ -107,6 +120,22 @@ class_palettes <- list(
 
 luc_classes <- names(class_palettes)
 
+# Different downscaling runs have used different casing for lu.to/lu.from
+# (UP50's rds: "Forest", "Cropland", ... already Title Case; UP51a's rds:
+# "forest", "cropland", "newforest", ... all lowercase, plus a NewForest
+# class this script doesn't track). Normalizing to the canonical spelling
+# right after reading means every downstream filter/palette lookup (which is
+# hardcoded to luc_classes' Title Case) works regardless of source casing.
+# "newforest" is deliberately left unmapped (becomes NA, matches nothing in
+# luc_classes and is silently ignored) — this script tracks 5 classes only,
+# same as the Maps tab's own class list; NewForest is scoped to the Land Use
+# Change tab, not expanded here.
+LUC_CLASS_CANONICAL <- setNames(luc_classes, tolower(luc_classes))
+normalize_luc_classes <- function(df) {
+  df %>% mutate(lu.to = unname(LUC_CLASS_CANONICAL[tolower(lu.to)]),
+                lu.from = unname(LUC_CLASS_CANONICAL[tolower(lu.from)]))
+}
+
 key_transitions <- list(
   list(from = "Forest",    to = "Cropland",  pal = brewer.pal(9, "Reds")),
   list(from = "Forest",    to = "Pasture",   pal = brewer.pal(9, "Purples")),
@@ -135,6 +164,18 @@ cat("ID raster loaded:", nrow(id_raster), "rows x", ncol(id_raster), "cols\n")
 # =============================================================================
 
 to_raster <- function(df) {
+  if (nrow(df) == 0) {
+    # A genuinely empty class/year/transition slice (confirmed for UP51a:
+    # Urban never loses area to any other class in any year — zero outflow
+    # rows exist at all, not just for one year) — classify() itself requires
+    # a non-empty reclass matrix, so this isn't "missing data" to skip, it's
+    # a real all-zero result. Every valid (non-NA) id_raster cell becomes 0;
+    # cells outside Brazil (already NA in id_raster) stay NA, same as the
+    # normal path below. A subsequent diff of two all-zero rasters correctly
+    # falls into plot_diff()'s existing "no difference" (.nodiff) branch.
+    r <- classify(id_raster, cbind(-Inf, Inf, 0))
+    return(terra::extend(r, brazil_ext))
+  }
   reclass_mat <- as.matrix(df[, c("id_c", "value")])
   r <- classify(id_raster, reclass_mat, others = NA)
   terra::extend(r, brazil_ext)
@@ -161,7 +202,8 @@ run_scenario <- function(sc) {
                     as.numeric(sub("_a$", "", ns)) + 1e6,
                     as.numeric(ns)),
       year = as.integer(year)
-    )
+    ) |>
+    normalize_luc_classes()
 
   cat("LUC rows:", nrow(luc), "| Years:", paste(sort(unique(luc$year)), collapse = ", "), "\n")
 
@@ -276,14 +318,15 @@ load_luc <- function(rds_path) {
                     as.numeric(sub("_a$", "", ns)) + 1e6,
                     as.numeric(ns)),
       year = as.integer(year)
-    )
+    ) |>
+    normalize_luc_classes()
 }
 
-run_diff_for_up <- function(up, ct_rds, ndc_rds) {
+run_diff_for_up <- function(up_token, ct_rds, ndc_rds) {
 
-  dir_diff <- sprintf("data/maps/diff/UP%d", up)
+  dir_diff <- sprintf("data/maps/diff/%s", up_token)
   cat("\n============================================================\n")
-  cat(" Difference maps (NDC - CT), UP", up, "\n")
+  cat(" Difference maps (NDC - CT), ", up_token, "\n")
   cat(" Output:  ", dir_diff, "\n")
   cat("============================================================\n")
 
@@ -375,19 +418,24 @@ run_diff_for_up <- function(up, ct_rds, ndc_rds) {
     }
   }
 
-  cat("\nDifference maps for UP", up, "done.\n")
+  cat("\nDifference maps for", up_token, "done.\n")
 }
 
 run_diff <- function() {
-  ups <- sort(unique(available_meta$up))
-  for (up in ups) {
-    rows <- available_meta[available_meta$up == up, ]
+  # Grouped by up_token (the literal "UP51a"/"UP50"/... string from the
+  # filename), not the numeric `up` column — two rows only pair up for a
+  # diff when they're the exact same calibration, and up_token is what
+  # actually identifies that (up itself is just a ranking number now, see
+  # the comment above scenario_up_token()).
+  up_tokens <- sort(unique(available_meta$up_token))
+  for (tok in up_tokens) {
+    rows <- available_meta[available_meta$up_token == tok, ]
     ct_row  <- rows[rows$pathway == "ct", ]
     ndc_row <- rows[rows$pathway == "ndc", ]
     if (nrow(ct_row) == 1 && nrow(ndc_row) == 1) {
-      run_diff_for_up(up, ct_row$rds[1], ndc_row$rds[1])
+      run_diff_for_up(tok, ct_row$rds[1], ndc_row$rds[1])
     } else {
-      cat("\nSkipping diff for UP", up, "— needs both Current Trends and NDC downscaled data.\n")
+      cat("\nSkipping diff for", tok, "— needs both Current Trends and NDC downscaled data.\n")
     }
   }
 }

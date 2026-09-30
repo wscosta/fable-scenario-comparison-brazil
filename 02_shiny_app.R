@@ -66,18 +66,28 @@ default_scenarios <- if ("up" %in% names(scenario_meta) && any(!is.na(scenario_m
   available_scenarios
 }
 
+# The UP token used for map folder/rds-file naming is read directly off the
+# xlsx filename (e.g. "UP51a" out of "FABLECalculator_BRA_UP51a_NDC.xlsx"),
+# not reconstructed from the numeric `up` column via sprintf("UP%d", ...) —
+# `up` may not be a clean integer forever (e.g. "UP51a", a revised UP51 with
+# updated Mapbiomas/IBGE land-use data, alongside the original UP51), and
+# %d would error on a non-integer value. `up` itself stays purely numeric,
+# used only for "which calibration is newest" ranking (default_scenarios,
+# maps_default_scenarios below) — never for path construction.
+scenario_up_token <- function(file) sub(".*_(UP[0-9]+[A-Za-z]*)_.*", "\\1", file)
+
 # The Maps tab only shows switches for scenarios with downscaled LUC data on
-# disk (data/luc/downscaled_LUC_UP<up>_<ct|ndc>.rds, matched case-insensitive
-# — the provided files have used both ct/ndc and CT/NDC casing) — a switch
-# for a scenario with no data would just be a dead control that always shows
-# "Map data not available". Recomputes automatically as downscaled data is
-# added or removed, no code changes needed.
+# disk (data/luc/downscaled_LUC_<UPtoken>_<ct|ndc>.rds, matched case-
+# insensitive — the provided files have used both ct/ndc and CT/NDC casing)
+# — a switch for a scenario with no data would just be a dead control that
+# always shows "Map data not available". Recomputes automatically as
+# downscaled data is added or removed, no code changes needed.
 maps_scenario_pathway <- ifelse(grepl("NDC", scenario_meta$file, ignore.case = TRUE), "ndc", "ct")
-maps_scenario_has_rds <- mapply(function(up, pw) {
+maps_scenario_has_rds <- mapply(function(file, pw) {
   length(list.files("data/luc",
-                    pattern = sprintf("^downscaled_LUC_UP%d_%s\\.rds$", up, pw),
+                    pattern = sprintf("^downscaled_LUC_%s_%s\\.rds$", scenario_up_token(file), pw),
                     ignore.case = TRUE)) > 0
-}, scenario_meta$up, maps_scenario_pathway)
+}, scenario_meta$file, maps_scenario_pathway)
 maps_available_scenarios <- scenario_meta$label[maps_scenario_has_rds]
 
 # The Maps tab also needs its own default, separate from default_scenarios
@@ -2568,15 +2578,26 @@ server <- function(input, output, session) {
   maps_scen_sel <- reactive(get_selected_scenarios_r(input, "maps", maps_available_scenarios))
 
   # Maps out a scenario label to its static-PNG folder slug, e.g.
-  # "UP50 - Current Trends" -> "UP50_ct" — matches 04_generate_maps.R's own
-  # dir_out naming (derived the same way: up column + NDC-in-filename check).
+  # "UP50 - Current Trends" -> "UP50_ct", "UP51a - Current Trends" ->
+  # "UP51a_ct" — matches 04_generate_maps.R's own dir_out naming (derived the
+  # same way: UP token read off the filename + NDC-in-filename check).
   scenario_map_dir <- function(label) {
     row <- scenario_meta[scenario_meta$label == label, ]
     if (nrow(row) == 0) return(NA_character_)
     pathway <- if (grepl("NDC", row$file[1], ignore.case = TRUE)) "ndc" else "ct"
-    sprintf("UP%d_%s", row$up[1], pathway)
+    sprintf("%s_%s", scenario_up_token(row$file[1]), pathway)
   }
-  scenario_up <- function(label) scenario_meta$up[match(label, scenario_meta$label)]
+  # Identifies "same calibration, safe to diff" — deliberately the up_token
+  # (e.g. "UP51a"), not the numeric `up` column, since two rows only really
+  # belong together when they share the exact filename token: a revised
+  # calibration like "UP51a" (updated Mapbiomas/IBGE land-use data) must
+  # never be paired with the original "UP51" for a difference map, even
+  # though a human might casually think of them as "the same UP".
+  scenario_calibration_token <- function(label) {
+    row <- scenario_meta[scenario_meta$label == label, ]
+    if (nrow(row) == 0) return(NA_character_)
+    scenario_up_token(row$file[1])
+  }
 
   # FABLE Calculator's own aggregate total (Mha) for a land-use class/year,
   # reusing the same landuse_map config + to_mha() the Land Use tab uses —
@@ -2683,9 +2704,9 @@ server <- function(input, output, session) {
                                                 "Turn on another Scenario switch to compare."))
     }
     diff_tile <- if (length(sel) >= 2) {
-      up1 <- scenario_up(sel[1]); up2 <- scenario_up(sel[2])
+      tok1 <- scenario_calibration_token(sel[1]); tok2 <- scenario_calibration_token(sel[2])
       both_available <- scenario_has_downscaled_data(sel[1]) && scenario_has_downscaled_data(sel[2])
-      if (!identical(up1, up2)) {
+      if (!identical(tok1, tok2)) {
         tagList(tags$strong("Difference"),
                 map_placeholder("&#x1F6A7;", "Not available yet",
                                 "Difference maps between different UP calibrations aren't supported yet — planned for a future update."))
@@ -2694,7 +2715,7 @@ server <- function(input, output, session) {
                 map_placeholder("&#x1F6AB;", "Map data not available",
                                 "Downscaled data is missing for one or both selected scenarios."))
       } else {
-        tagList(tags$strong("Difference"), make_map_img(sprintf("diff/UP%d", up1), type_sel, var_sel, year))
+        tagList(tags$strong("Difference"), make_map_img(sprintf("diff/%s", tok1), type_sel, var_sel, year))
       }
     } else {
       tagList(tags$strong("Difference"),
