@@ -89,6 +89,47 @@ missing_meta <- scenario_meta[is.na(scenario_meta$rds), ]
 if (nrow(missing_meta) > 0)
   cat("Skipping (no downscaled data yet):", paste(missing_meta$label, collapse = ", "), "\n")
 
+# ── Per-scenario unit scale factor ────────────────────────────────────────────
+# Different downscaling runs have reported `value` in different raw units:
+# UP50's rds is in hectares (needs *0.001 to reach the "1000 ha"/kha unit the
+# legend and scale_breaks are calibrated to); UP51a's rds (Mapbiomas
+# Collection 10 + IBGE) turned out to already be roughly in kha, so the old
+# hardcoded 0.001 undercounted its maps by ~1000x ("tudo com valor muito
+# baixo" — reported directly by the user after checking the UP51a maps).
+# Rather than hardcode a second magic constant (which would just repeat the
+# same failure mode for the *next* differently-scaled data source), the scale
+# factor is derived per scenario by cross-checking the raw downscaled total
+# land area against the FABLE Calculator's own total for the same
+# scenario+year (data/processed/df_scenarios.rds, already produced by
+# 01_process_data.R) — both should describe the same ~850 Mha of Brazil, so
+# their ratio is exactly the correction needed, whatever convention that
+# scenario's downscaling run happened to use.
+df_scenarios_calc <- if (file.exists("data/processed/df_scenarios.rds")) {
+  readRDS("data/processed/df_scenarios.rds")
+} else {
+  message("data/processed/df_scenarios.rds not found — falling back to the legacy hardcoded 0.001 scale factor for every scenario. Run 01_process_data.R first if maps come out at the wrong scale.")
+  NULL
+}
+CALC_AREA_COLS <- c("CalcForest", "CalcCropland", "CalcPasture", "CalcOtherLand", "CalcUrban")
+
+compute_scale_factor <- function(luc, label) {
+  fallback <- 0.001
+  if (is.null(df_scenarios_calc)) return(fallback)
+  calc_rows <- df_scenarios_calc[df_scenarios_calc$scenario == label, ]
+  if (nrow(calc_rows) == 0) return(fallback)
+  common_years <- intersect(unique(luc$year), as.integer(calc_rows$Year))
+  if (length(common_years) == 0) return(fallback)
+  ref_year  <- min(common_years)
+  raw_total <- sum(luc$value[luc$year == ref_year & !is.na(luc$lu.to)], na.rm = TRUE)
+  calc_row  <- calc_rows[as.integer(calc_rows$Year) == ref_year, ][1, ]
+  calc_total_kha <- sum(as.numeric(calc_row[, CALC_AREA_COLS]), na.rm = TRUE)
+  if (!is.finite(raw_total) || raw_total == 0 || !is.finite(calc_total_kha)) return(fallback)
+  factor <- calc_total_kha / raw_total
+  cat(sprintf("  Scale factor for %s: %.6f (reference year %d: raw total %.0f vs Calculator total %.1f kha)\n",
+             label, factor, ref_year, raw_total, calc_total_kha))
+  factor
+}
+
 args <- commandArgs(trailingOnly = TRUE)
 diff_only <- FALSE
 if (length(args) > 0) {
@@ -206,6 +247,7 @@ run_scenario <- function(sc) {
     normalize_luc_classes()
 
   cat("LUC rows:", nrow(luc), "| Years:", paste(sort(unique(luc$year)), collapse = ", "), "\n")
+  scale_factor <- compute_scale_factor(luc, sc$label)
 
   # --- Part 1: Land Cover Maps ---
   cat("\n--- Part 1: Land Cover ---\n")
@@ -216,7 +258,7 @@ run_scenario <- function(sc) {
       df_yr <- luc |>
         filter(lu.to == cls, year == yr) |>
         group_by(id_c) |>
-        summarise(value = sum(value, na.rm = TRUE) * 0.001, .groups = "drop")
+        summarise(value = sum(value, na.rm = TRUE) * scale_factor, .groups = "drop")
 
       total_mha <- sum(df_yr$value) / 1000
       r         <- to_raster(df_yr)
@@ -248,7 +290,7 @@ run_scenario <- function(sc) {
       df_yr <- luc |>
         filter(lu.from == cls, lu.to != cls, year == yr) |>
         group_by(id_c) |>
-        summarise(value = sum(value, na.rm = TRUE) * 0.001, .groups = "drop")
+        summarise(value = sum(value, na.rm = TRUE) * scale_factor, .groups = "drop")
 
       total_mha <- sum(df_yr$value) / 1000
       r         <- to_raster(df_yr)
@@ -279,7 +321,7 @@ run_scenario <- function(sc) {
       df_yr <- luc |>
         filter(lu.from == tr$from, lu.to == tr$to, year == yr) |>
         group_by(id_c) |>
-        summarise(value = sum(value, na.rm = TRUE) * 0.001, .groups = "drop")
+        summarise(value = sum(value, na.rm = TRUE) * scale_factor, .groups = "drop")
 
       total_mha <- sum(df_yr$value) / 1000
       r         <- to_raster(df_yr)
@@ -322,7 +364,7 @@ load_luc <- function(rds_path) {
     normalize_luc_classes()
 }
 
-run_diff_for_up <- function(up_token, ct_rds, ndc_rds) {
+run_diff_for_up <- function(up_token, ct_rds, ct_label, ndc_rds, ndc_label) {
 
   dir_diff <- sprintf("data/maps/diff/%s", up_token)
   cat("\n============================================================\n")
@@ -335,6 +377,11 @@ run_diff_for_up <- function(up_token, ct_rds, ndc_rds) {
 
   luc_ct  <- load_luc(ct_rds)
   luc_ndc <- load_luc(ndc_rds)
+  # CT and NDC of the same UP normally share a downscaling run/convention,
+  # but each gets its own cross-checked scale factor anyway rather than
+  # assuming that — cheap to compute, and correct even if they ever diverge.
+  scale_ct  <- compute_scale_factor(luc_ct,  ct_label)
+  scale_ndc <- compute_scale_factor(luc_ndc, ndc_label)
 
   years <- sort(unique(luc_ct$year))
 
@@ -366,9 +413,9 @@ run_diff_for_up <- function(up_token, ct_rds, ndc_rds) {
   for (cls in luc_classes) {
     for (yr in years) {
       df_ct  <- luc_ct  |> filter(lu.to == cls, year == yr) |>
-                group_by(id_c) |> summarise(value = sum(value) * 0.001, .groups = "drop")
+                group_by(id_c) |> summarise(value = sum(value) * scale_ct, .groups = "drop")
       df_ndc <- luc_ndc |> filter(lu.to == cls, year == yr) |>
-                group_by(id_c) |> summarise(value = sum(value) * 0.001, .groups = "drop")
+                group_by(id_c) |> summarise(value = sum(value) * scale_ndc, .groups = "drop")
 
       r_diff    <- to_raster(df_ndc) - to_raster(df_ct)
       delta_mha <- (sum(df_ndc$value) - sum(df_ct$value)) / 1000
@@ -385,9 +432,9 @@ run_diff_for_up <- function(up_token, ct_rds, ndc_rds) {
   for (cls in luc_classes) {
     for (yr in years) {
       df_ct  <- luc_ct  |> filter(lu.from == cls, lu.to != cls, year == yr) |>
-                group_by(id_c) |> summarise(value = sum(value) * 0.001, .groups = "drop")
+                group_by(id_c) |> summarise(value = sum(value) * scale_ct, .groups = "drop")
       df_ndc <- luc_ndc |> filter(lu.from == cls, lu.to != cls, year == yr) |>
-                group_by(id_c) |> summarise(value = sum(value) * 0.001, .groups = "drop")
+                group_by(id_c) |> summarise(value = sum(value) * scale_ndc, .groups = "drop")
 
       r_diff    <- to_raster(df_ndc) - to_raster(df_ct)
       delta_mha <- (sum(df_ndc$value) - sum(df_ct$value)) / 1000
@@ -405,9 +452,9 @@ run_diff_for_up <- function(up_token, ct_rds, ndc_rds) {
     label <- sprintf("%s_to_%s", tr$from, tr$to)
     for (yr in years) {
       df_ct  <- luc_ct  |> filter(lu.from == tr$from, lu.to == tr$to, year == yr) |>
-                group_by(id_c) |> summarise(value = sum(value) * 0.001, .groups = "drop")
+                group_by(id_c) |> summarise(value = sum(value) * scale_ct, .groups = "drop")
       df_ndc <- luc_ndc |> filter(lu.from == tr$from, lu.to == tr$to, year == yr) |>
-                group_by(id_c) |> summarise(value = sum(value) * 0.001, .groups = "drop")
+                group_by(id_c) |> summarise(value = sum(value) * scale_ndc, .groups = "drop")
 
       r_diff    <- to_raster(df_ndc) - to_raster(df_ct)
       delta_mha <- (sum(df_ndc$value) - sum(df_ct$value)) / 1000
@@ -433,7 +480,7 @@ run_diff <- function() {
     ct_row  <- rows[rows$pathway == "ct", ]
     ndc_row <- rows[rows$pathway == "ndc", ]
     if (nrow(ct_row) == 1 && nrow(ndc_row) == 1) {
-      run_diff_for_up(tok, ct_row$rds[1], ndc_row$rds[1])
+      run_diff_for_up(tok, ct_row$rds[1], ct_row$label[1], ndc_row$rds[1], ndc_row$label[1])
     } else {
       cat("\nSkipping diff for", tok, "— needs both Current Trends and NDC downscaled data.\n")
     }

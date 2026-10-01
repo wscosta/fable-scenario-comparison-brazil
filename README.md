@@ -238,6 +238,8 @@ The controls are displayed in this order:
 | **Years** | Switch | "Calibration Only" — off = 2000–2050, on = 2000–2020 |
 | **Chart type** | Icon dropdown | Line chart · Bar chart · Area chart |
 
+**Other Land** = `CalcOtherLand` + `NewOtherLand` from the Calculator (the latter is land recently converted to "other" that hasn't aged into the mature total yet — it can exceed `CalcOtherLand` itself by 2050). Every other class reads a single Calculator column.
+
 ### Layout
 
 The chart always appears on the left. The data table position depends on the Years selection:

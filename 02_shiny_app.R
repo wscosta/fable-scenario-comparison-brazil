@@ -186,7 +186,18 @@ landuse_map <- list(
   "Forest"     = list(fable_col = "CalcForest",    fable_unit = "1000 ha",
                       hist_type = "Forest",                  hist_source = "Mapbiomas",
                       y_label   = "Area (Mha)"),
-  "Other Land" = list(fable_col = "CalcOtherLand", fable_unit = "1000 ha",
+  # NewOtherLand is a real, growing stock (land recently converted to "other"
+  # that hasn't been folded into the mature CalcOtherLand total yet) — the
+  # downscaled LUC raster has no separate "new" vs "mature" OtherLand class,
+  # so the two Calc columns must be summed to match what the Maps tab's single
+  # OtherLand raster class actually represents. Unlike NewForest (which IS a
+  # distinct raster class and is deliberately excluded, see 04_generate_maps.R),
+  # there's nothing to exclude here. fable_unit stays "1000 ha" even though
+  # NewOtherLand's own unit row in the Calculator says "1000 ha per 5 year" —
+  # its values are empirically on the same 1000-ha scale as CalcOtherLand
+  # (monotonically non-decreasing stock, not a period flow), so this is an
+  # upstream Calculator labeling quirk rather than a different unit.
+  "Other Land" = list(fable_cols = c("CalcOtherLand", "NewOtherLand"), fable_unit = "1000 ha",
                       hist_type = "Other Land",              hist_source = "Mapbiomas",
                       y_label   = "Area (Mha)"),
   "Urban"      = list(fable_col = "CalcUrban",     fable_unit = "1000 ha",
@@ -194,9 +205,12 @@ landuse_map <- list(
                       y_label   = "Area (Mha)")
 )
 
-# Keep only classes whose FABLE column exists in the data
+# Keep only classes whose FABLE column(s) exist in the data
 fable_cols  <- names(df_scenarios)
-landuse_map <- Filter(function(cfg) cfg$fable_col %in% fable_cols, landuse_map)
+landuse_map <- Filter(function(cfg) {
+  cols <- if (!is.null(cfg$fable_cols)) cfg$fable_cols else cfg$fable_col
+  all(cols %in% fable_cols)
+}, landuse_map)
 
 # Helper: historical data for a class (empty tibble if not found)
 get_hist <- function(class_name, x_max) {
@@ -207,6 +221,26 @@ get_hist <- function(class_name, x_max) {
            year > 1995, year <= x_max) %>%
     select(year, value) %>%
     mutate(value = as.numeric(value))
+}
+
+# Helper: FABLE Calculator value for a class/scenario/year window, in Mha —
+# sums cfg$fable_cols when present (multi-column classes like Other Land),
+# otherwise reads cfg$fable_col directly. Same vector-sum pattern as
+# emissions_map's get_emiss_fable.
+get_landuse_fable <- function(class_name, scenario_name, x_max) {
+  cfg  <- landuse_map[[class_name]]
+  base <- df_scenarios %>% filter(scenario == scenario_name, Year <= x_max)
+  dat <- if (!is.null(cfg$fable_cols)) {
+    base %>%
+      select(year = Year, all_of(cfg$fable_cols)) %>%
+      mutate(value = rowSums(across(all_of(cfg$fable_cols), as.numeric), na.rm = TRUE)) %>%
+      select(year, value)
+  } else {
+    base %>%
+      select(year = Year, value = all_of(cfg$fable_col)) %>%
+      mutate(value = as.numeric(value))
+  }
+  dat %>% mutate(value = to_mha(value, class_name, cfg$fable_unit))
 }
 
 # ── Colors ────────────────────────────────────────────────────────────────────
@@ -301,13 +335,8 @@ base_layout <- function(p, title_text, title_color = "black", x_max, y_range,
 
 # ── Compute shared y-range ────────────────────────────────────────────────────
 calc_y_range <- function(class_name, x_max, zero_base = TRUE) {
-  cfg  <- landuse_map[[class_name]]
-  col  <- cfg$fable_col
-  scen_vals <- to_mha(
-    as.numeric(df_scenarios[[col]][df_scenarios$Year <= x_max]),
-    col,
-    landuse_map[[class_name]]$fable_unit
-  )
+  scen_vals <- bind_rows(lapply(available_scenarios, get_landuse_fable,
+                                 class_name = class_name, x_max = x_max))$value
   hist_vals <- get_hist(class_name, x_max)$value
   all_vals  <- c(scen_vals, hist_vals)
   pad <- diff(range(all_vals, na.rm = TRUE)) * 0.05
@@ -349,10 +378,7 @@ make_plot <- function(class_name, scenario_sel, x_max, y_range, chart_type = "Li
   p   <- plot_ly()
 
   for (s in scenario_sel) {
-    dat <- df_scenarios %>%
-      filter(scenario == s, Year <= x_max) %>%
-      select(year = Year, value = all_of(cfg$fable_col)) %>%
-      mutate(value = to_mha(as.numeric(value), cfg$fable_col, cfg$fable_unit))
+    dat   <- get_landuse_fable(class_name, s, x_max)
     hover <- paste0("%{x}: <b>%{y:.2f} Mha</b><extra>", s, "</extra>")
     p <- add_scenario_trace(p, dat, s, scenario_colors[[s]], chart_type, hover)
   }
@@ -368,19 +394,12 @@ make_plot <- function(class_name, scenario_sel, x_max, y_range, chart_type = "Li
 
 # ── Table builder ─────────────────────────────────────────────────────────────
 make_table_data <- function(class_name, scenario_sel, x_max) {
-  cfg   <- landuse_map[[class_name]]
-  col   <- cfg$fable_col
   years <- seq(2000, x_max, 5)
   rows  <- list()
 
-  pull_scenario <- function(scen_name) {
-    raw <- df_scenarios %>%
-      filter(scenario == scen_name, Year %in% years) %>%
-      arrange(Year) %>%
-      pull(all_of(col)) %>%
-      as.numeric()
-    to_mha(raw, col, cfg$fable_unit)
-  }
+  pull_scenario <- function(scen_name)
+    get_landuse_fable(class_name, scen_name, x_max) %>%
+      filter(year %in% years) %>% arrange(year) %>% pull(value)
 
   for (s in scenario_sel) rows[[s]] <- pull_scenario(s)
 
@@ -399,8 +418,6 @@ make_table_data <- function(class_name, scenario_sel, x_max) {
 
 # ── Difference table builder ──────────────────────────────────────────────────
 make_diff_data <- function(class_name, scenario_sel, type = "absolute") {
-  cfg   <- landuse_map[[class_name]]
-  col   <- cfg$fable_col
   years <- seq(2000, 2020, 5)
 
   hist_data <- get_hist(class_name, 2020)
@@ -409,14 +426,9 @@ make_diff_data <- function(class_name, scenario_sel, type = "absolute") {
     if (length(v) == 0) NA_real_ else v[1]
   })
 
-  pull_scenario <- function(scen_name) {
-    raw <- df_scenarios %>%
-      filter(scenario == scen_name, Year %in% years) %>%
-      arrange(Year) %>%
-      pull(all_of(col)) %>%
-      as.numeric()
-    to_mha(raw, col, cfg$fable_unit)
-  }
+  pull_scenario <- function(scen_name)
+    get_landuse_fable(class_name, scen_name, 2020) %>%
+      filter(year %in% years) %>% arrange(year) %>% pull(value)
 
   rows <- list()
   for (s in scenario_sel) {
@@ -2607,11 +2619,16 @@ server <- function(input, output, session) {
   # "Other Land" (with space, matching the Land Use tab's selectInput) — same
   # class, different casing convention in each tab, so normalize here.
   fable_landuse_total_mha <- function(scenario_label, map_class, year) {
-    cfg <- landuse_map[[if (map_class == "OtherLand") "Other Land" else map_class]]
-    if (is.null(cfg)) return(NA_real_)
-    row <- df_scenarios[df_scenarios$scenario == scenario_label & df_scenarios$Year == as.integer(year), ]
-    if (nrow(row) == 0) return(NA_real_)
-    to_mha(as.numeric(row[[cfg$fable_col]][1]), cfg$fable_col, cfg$fable_unit)
+    class_name  <- if (map_class == "OtherLand") "Other Land" else map_class
+    if (is.null(landuse_map[[class_name]])) return(NA_real_)
+    target_year <- as.integer(year)
+    # NB: the filter's RHS must not be a bare `year` — dplyr's data masking
+    # would resolve it to dat's own `year` column (not this function's `year`
+    # argument), making the filter a no-op that silently always keeps row 1.
+    dat <- get_landuse_fable(class_name, scenario_label, target_year) %>%
+      filter(year == target_year)
+    if (nrow(dat) == 0) return(NA_real_)
+    dat$value[1]
   }
 
   # Only appends the FABLE Calculator total for Land Cover (Outflows/
