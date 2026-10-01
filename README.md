@@ -96,7 +96,7 @@ FABLECalculator_BRA_UP46_CurrentTrends.xlsx,UP46 - Current Trends,46
 
 **Default-on scenarios:** the optional `up` column controls which switches start checked — only the rows with the *highest* `up` value default to on (currently the two UP51a rows); everything else starts off but is still selectable. Adding a new, higher-numbered UP row automatically becomes the new default the next time the app launches, no code changes needed. Omitting the `up` column entirely makes every scenario default to checked. `up` doesn't need to be a whole number — a revised calibration that supersedes an existing UP (like UP51a superseding UP51) can use a decimal (`51.1`) to rank above it without colliding.
 
-**Switches stay in sync across tabs:** toggling a scenario on or off on any tab (Land Use, Land Use Change, Emissions, Crops, Livestock, Trade, Food) applies the same change everywhere else — there's one shared selection, not seven independent ones.
+**Switches stay in sync across tabs:** toggling a scenario on or off on any tab (Land Use, Land Use Change, Emissions, Crops, Livestock, Trade, Food, Transition Matrix) applies the same change everywhere else — there's one shared selection, not eight independent ones.
 
 ## 📁 Repository structure
 
@@ -299,7 +299,7 @@ Visualizes gross land-cover *conversions* between classes — not the class tota
 |---------|---------|
 | **Scenario** | One switch per scenario in `scenarios.csv`; shared with every other tab (toggling here affects, and is affected by, all other tabs) |
 | **Period** | Slider, 2000–2050, default 2020–2050 (hidden for Stacked Bar — see below) |
-| **Diagram type** | Icon dropdown — Chord (default) · Sankey · Stacked Bar |
+| **Diagram type** | Icon dropdown — Sankey (default) · Chord · Stacked Bar |
 
 - **Chord** — a circular diagram; each class is an arc, each conversion an inner band (coloured and tapered by source class).
 - **Sankey** — a flow diagram; classes on the left (start of the Period window) and right (end), one link per conversion.
@@ -506,6 +506,18 @@ Rscript 04_generate_maps.R diff                   # diffs only (fastest)
 | **Chart type** | Icon dropdown — Line chart · Bar chart · Area chart |
 
 Values are in **kcal/cap/day**. Source: `kcal_feas` column from the aggregate SCENATHON_report table. No historical data — the chart shows scenario lines only and the right panel shows a values table rounded to whole numbers.
+
+## 🔁 Shiny app — Transition Matrix tab
+
+A heatmap view of the same land-use conversion data the Land Use Change tab's Chord/Sankey diagrams use — rows are the "From" class, columns are "To", one heatmap per selected scenario, side by side.
+
+| Control | Options |
+|---------|---------|
+| **Scenario** | One switch per scenario in `scenarios.csv`; shared with every other tab |
+| **Period** | Slider, 2000–2050, default 2020–2050 — same control as the Land Use Change tab, summing every 5-year period inside the chosen window |
+| **Show as** | Percentage (row-normalized — each row sums to 100% of that class's starting area, diagonal included) · Area (Mha) |
+
+Each cell shows both an always-visible value and a hover tooltip (`From → To: value`). The diagonal is that class's "stayed as X" share — e.g. a Forest row reading 92% means 92% of that class's starting area was still Forest at the end of the selected window, with the rest spread across whichever classes it converted to. Colour scale runs light green (low) to dark blue (high); cell text automatically switches between black and white so it stays readable against both ends of the scale. Row/column headers ("FROM"/"TO") and class names are always horizontal.
 
 ## 📄 Generating the Word report
 

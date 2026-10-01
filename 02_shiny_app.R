@@ -1408,6 +1408,168 @@ make_luc_chord <- function(scen, classes = LUC_CHORD_CLASSES, start_year = 2020,
            tooltipUnit = " Mha", precision = 1, margin = 100)
 }
 
+# ── Transition Matrix tab (heatmap) ────────────────────────────────────────
+# A 4th view of the exact same calc_landmatrix-derived data the Chord/Sankey
+# diagrams use (get_luc_flows()/luc_flow_matrix()) — just pivoted into a dense
+# matrix and rendered as a heatmap instead of a flow diagram. "Percentage"
+# mode divides each row by its own total: since luc_flow_matrix()'s diagonal
+# is already the persistence value (AreaStart - total outflow, see
+# get_luc_flows), every row's off-diagonal + diagonal cells sum to exactly
+# that class's AreaStart at start_year, so row-normalizing gives a clean
+# "100% of class X's start_year area went ..." reading, diagonal included.
+transmatrix_value_matrix <- function(scen, classes = LUC_CLASSES, start_year = 2020,
+                                      end_year = 2050, mode = "pct") {
+  m <- luc_flow_matrix(scen, classes, start_year, end_year)  # Mha; diag = persistence
+  if (mode != "pct") return(m)
+  row_sums <- rowSums(m)
+  pct <- m / row_sums * 100
+  # A class with 0 area at start_year (e.g. NewForest in most Current Trends
+  # scenarios) divides 0/0 -> NaN for every cell in its row; shown as a real
+  # 0% (a normal coloured cell), not NA/blank, per explicit user request.
+  pct[!is.finite(pct)] <- 0
+  pct
+}
+
+make_transmatrix_heatmap <- function(scen, classes = LUC_CLASSES, start_year = 2020,
+                                      end_year = 2050, mode = "pct") {
+  title_txt  <- paste0("<b>", luc_title_text(scen, start_year, end_year), "</b>")
+  title_font <- list(color = "black", size = 15)
+  empty_plot <- function(msg) plot_ly() %>%
+    layout(title = list(text = title_txt, font = title_font),
+           xaxis = list(visible = FALSE), yaxis = list(visible = FALSE),
+           annotations = list(text = msg, showarrow = FALSE, font = list(size = 13))) %>%
+    config(responsive = TRUE)
+
+  if (end_year <= start_year) return(empty_plot("End year must be after start year"))
+
+  m <- transmatrix_value_matrix(scen, classes, start_year, end_year, mode)
+  if (all(is.na(m) | m == 0)) return(empty_plot("No land-use transitions in this window"))
+
+  n      <- length(classes)
+  labels <- unname(LUC_CLASS_LABELS[classes])
+  grid   <- expand.grid(i = seq_len(n), j = seq_len(n))
+  val    <- m[cbind(grid$i, grid$j)]
+
+  cell_fmt   <- if (mode == "pct") "%.0f%%" else "%.2f"
+  hover_fmt  <- if (mode == "pct") "%.1f%%" else "%.2f Mha"
+  cell_text  <- ifelse(is.na(val), "", sprintf(cell_fmt, val))
+  hover_text <- sprintf("%s &#8594; %s<br><b>%s</b>", labels[grid$i], labels[grid$j],
+                        ifelse(is.na(val), "n/a", sprintf(hover_fmt, val)))
+
+  # Fixed green (low) -> blue (high) scale — needs an actual light-to-dark
+  # span (not two equally-saturated colours) for the text-contrast switch
+  # below to ever produce both black and white. heat_low is a step lighter
+  # than NewForest's own palette colour (#A5D6A7) per explicit user request.
+  # zmin/zmax are pinned explicitly (0-100 for pct, 0-max for area) so the
+  # colour each cell actually renders in and the luminance computed below for
+  # its text colour are always reading off the exact same scale.
+  heat_low  <- "#C8E6C9"
+  heat_high <- "#002776"
+  zmin <- 0
+  zmax <- if (mode == "pct") 100 else max(val, na.rm = TRUE)
+
+  # Per-cell text colour: interpolate the same colour this value maps to on
+  # the heatmap's own scale, then pick white/black by perceived luminance —
+  # "se for escura a fonte precisa estar branca e preta caso contrário" —
+  # rather than a fixed value threshold, so it's correct regardless of which
+  # two colours the scale uses.
+  ramp <- grDevices::colorRamp(c(heat_low, heat_high))
+  t_norm <- pmin(pmax((val - zmin) / (zmax - zmin), 0), 1)
+  rgb_m  <- ramp(ifelse(is.na(t_norm), 0, t_norm))
+  lum    <- 0.299 * rgb_m[, 1] + 0.587 * rgb_m[, 2] + 0.114 * rgb_m[, 3]
+  text_col <- ifelse(is.na(val), "black", ifelse(lum < 140, "white", "black"))
+
+  # Built as a plain list of per-cell annotation objects, not add_annotations()
+  # — add_annotations() doesn't vectorize a nested list argument like `font`
+  # across points (every cell silently got plotly's default grey instead of
+  # each cell's own black/white), so each annotation needs its own font here.
+  cell_annotations <- lapply(seq_len(n * n), function(k) {
+    list(x = labels[grid$j[k]], y = labels[grid$i[k]], text = cell_text[k],
+         showarrow = FALSE, font = list(color = text_col[k], size = 10))
+  })
+
+  plot_ly(
+    x = labels, y = labels, z = m,
+    type = "heatmap", colors = c(heat_low, heat_high), zmin = zmin, zmax = zmax,
+    showscale = TRUE,
+    text = matrix(hover_text, n, n), hoverinfo = "text",
+    colorbar = list(title = if (mode == "pct") "%" else "Mha", len = 0.8)
+  ) %>%
+    layout(
+      annotations = cell_annotations,
+      # Plotly's default title y-position doesn't account for xaxis.side =
+      # "top" pushing the "TO" axis title + tick row up into the same band —
+      # pinning the title to the very top (y near 1, yanchor "top") and
+      # giving it enough headroom (margin.t) keeps the two from colliding;
+      # confirmed via getBoundingClientRect() on both in the live DOM.
+      title  = list(text = title_txt, font = title_font, y = 0.99, yanchor = "top"),
+      xaxis  = list(title = list(text = "<b>TO</b>"), side = "top",
+                    tickangle = 0, tickfont = list(size = 9)),
+      yaxis  = list(title = list(text = "<b>FROM</b>"), autorange = "reversed",
+                    tickangle = 0, tickfont = list(size = 9)),
+      margin = list(t = 110, l = 90)
+    ) %>%
+    config(responsive = TRUE)
+}
+
+transmat_sidebar_ui <- function() {
+  tagList(
+    scenario_switches_ui("transmat"),
+    sliderInput("transmat_years", "Period", min = 2000, max = 2050, step = 5,
+               value = c(2020, 2050), sep = "", ticks = FALSE),
+    div(style = "position:relative; height:14px; margin-top:-6px; font-size:11px; color:#666;",
+        span("2000", style = "position:absolute; left:0;"),
+        span("2020", style = "position:absolute; left:40%; transform:translateX(-50%);"),
+        span("2050", style = "position:absolute; right:0;")
+    ),
+    radioButtons("transmat_mode", "Show as",
+                 choices = c("Percentage" = "pct", "Area (Mha)" = "area"),
+                 selected = "pct")
+  )
+}
+
+# One heatmap per selected scenario, side by side — same grid pattern as
+# make_luc_server (tiered panel_h/ncol by visible-scenario count, pre-
+# registered render functions per available_scenarios via local()'s eager
+# `scen <- s`, see [[feature-land-use-change-tab]] for why that's load-bearing).
+make_transmat_server <- function(input, output, session) {
+  transmat_scen_sel <- reactive(get_selected_scenarios_r(input, "transmat"))
+
+  output$transmat_grid <- renderUI({
+    req(length(transmat_scen_sel()) > 0)
+    scens   <- transmat_scen_sel()
+    ncol    <- min(length(scens), 3)
+    w       <- floor(12 / ncol)
+    # Shorter tiers than the Land Use Change tab's Chord/Sankey grid (760/620/
+    # 480px) — a from/to heatmap is roughly square and doesn't need nearly as
+    # much height as a Chord diagram's circular padding, and the previous
+    # taller values were pushing a multi-row grid (4+ scenarios) well past the
+    # viewport, forcing scrolling for no visual benefit.
+    panel_h <- if (ncol == 1) "560px" else if (ncol == 2) "460px" else "380px"
+
+    fluidRow(lapply(scens, function(s) {
+      sid <- make.names(s)
+      column(width = w, div(class = "luc-frame",
+        plotlyOutput(paste0("transmat_plot_", sid), width = "100%", height = panel_h)))
+    }))
+  })
+
+  for (s in available_scenarios) {
+    local({
+      scen <- s
+      sid  <- make.names(scen)
+      on_r <- reactive(isTRUE(input[[paste0("transmat_scen_", sid)]]))
+
+      output[[paste0("transmat_plot_", sid)]] <- renderPlotly({
+        req(on_r(), input$transmat_years)
+        make_transmatrix_heatmap(scen, start_year = input$transmat_years[1],
+                                  end_year = input$transmat_years[2],
+                                  mode = input$transmat_mode %||% "pct")
+      })
+    })
+  }
+}
+
 # Fixed periods: the Stacked Bar always shows the full trajectory, no
 # start/end window to pick. Unlike MAgPIE (whose cumulative-since-1995
 # series needs a diff() and so has a bar for 2000 vs. the 1995 baseline),
@@ -1516,7 +1678,7 @@ luc_sidebar_ui <- function() {
       )
     ),
     chart_type_ui("luc_diagram", choices = LUC_DIAGRAM_CHOICES, icons = LUC_DIAGRAM_ICONS,
-                  default = "Chord", label = "Diagram type")
+                  default = "Sankey", label = "Diagram type")
   )
 }
 
@@ -1538,7 +1700,7 @@ make_luc_server <- function(input, output, session) {
     scens   <- luc_scen_sel()
     ncol    <- min(length(scens), 3)
     w       <- floor(12 / ncol)
-    diagram <- input$luc_diagram %||% "Chord"
+    diagram <- input$luc_diagram %||% "Sankey"
     yrs     <- input$luc_years %||% c(2020, 2050)
 
     # chorddiagOutput/plotlyOutput default to a small fixed height, which
@@ -1835,6 +1997,32 @@ ui <- page_navbar(
           });
         }).observe(document.body, { childList: true, subtree: true });
       });
+
+      // Transition Matrix grid: output$transmat_grid (renderUI) rebuilds its
+      // whole fluidRow of plotlyOutput()s from scratch on every scenario
+      // toggle. config(responsive = TRUE) (set on the plot itself, see
+      // make_transmatrix_heatmap) is enough for a BRAND NEW tile — but a tile
+      // that already existed before the toggle (its scenario stayed checked)
+      // keeps the exact same output id across the rebuild, and its Plotly
+      // widget instance gets reattached to the fresh (but now differently-
+      // sized) container without that attachment alone triggering a resize;
+      // confirmed directly in the browser: after shrinking the grid from 2 to
+      // 3 columns, the 2 pre-existing tiles stayed frozen at their old,
+      // larger SVG size indefinitely (not just briefly) while only the newly
+      // added 3rd tile picked up the right size from the start. Forcing
+      // Plotly.relayout(gd, {autosize: true}) on every tile shortly after
+      // transmat_grid's own HTML lands (letting Shiny's subsequent render of
+      // each individual transmat_plot_* output finish first) fixes this
+      // deterministically, regardless of whether config(responsive)'s own
+      // ResizeObserver decides to fire for a given tile.
+      $(document).on('shiny:value', function(event) {
+        if (event.name !== 'transmat_grid') return;
+        setTimeout(function() {
+          document.querySelectorAll('[id^=\"transmat_plot_\"]').forEach(function(gd) {
+            if (window.Plotly && gd._fullLayout) Plotly.relayout(gd, { autosize: true });
+          });
+        }, 250);
+      });
     "))
   ),
   theme = bs_theme(primary = "#007B8A", version = 5),
@@ -1957,6 +2145,14 @@ ui <- page_navbar(
       uiOutput("food_charts_ui")
     )
   ),
+
+  nav_panel(HTML("&#x1F501; Transition Matrix"),
+    layout_sidebar(
+      sidebar = sidebar(transmat_sidebar_ui()),
+      uiOutput("transmat_grid")
+    )
+  ),
+
   nav_panel(HTML("🌎 Maps"),
     layout_sidebar(
       sidebar = sidebar(
@@ -2013,7 +2209,7 @@ server <- function(input, output, session) {
   # finished, so an unforced `s` parameter is still an unevaluated promise
   # pointing at the *loop variable itself*, which every call shares. Forcing
   # it up front freezes each call's own copy before the loop can move on.
-  SCENARIO_TAB_PREFIXES <- c("lu", "luc", "emiss", "crop", "live", "trade", "food")
+  SCENARIO_TAB_PREFIXES <- c("lu", "luc", "emiss", "crop", "live", "trade", "food", "transmat")
   scenario_state <- reactiveValues()
   for (s in available_scenarios) scenario_state[[s]] <- s %in% default_scenarios
 
@@ -2747,6 +2943,7 @@ server <- function(input, output, session) {
   })
 
   make_luc_server(input, output, session)
+  make_transmat_server(input, output, session)
 }
 
 shinyApp(ui, server)
