@@ -1793,8 +1793,101 @@ make_luc_server <- function(input, output, session) {
 }
 
 # ── Static assets ─────────────────────────────────────────────────────────────
-addResourcePath("images", normalizePath("data/images", mustWork = FALSE))
-addResourcePath("maps",   normalizePath("data/maps",   mustWork = FALSE))
+addResourcePath("images",    normalizePath("data/images",          mustWork = FALSE))
+addResourcePath("maps",      normalizePath("data/maps",            mustWork = FALSE))
+addResourcePath("hist_maps", normalizePath("data/historical_maps", mustWork = FALSE))
+
+# ── Historical Maps tab config ────────────────────────────────────────────────
+# Static PNGs copied as-is from the sister MAgPIE app (maps/IBGE/landUse and
+# maps/Mapbiomas_C10/landUse) into data/historical_maps/ — not generated here
+# (04_generate_maps.R doesn't touch them) and, unlike data/maps/, tracked in
+# git, since nothing in this repo can regenerate them. File names:
+# IBGE/IBGE_Cropland_<year>.png and
+# Mapbiomas_C10/Mapbiomas_C10_<class, spaces -> "_">_<year>.png.
+HIST_MAP_YEARS <- seq(1995, 2020, by = 5)
+
+# MapBiomas Collection 10's 30 raw classes plus two synthesized aggregates
+# ("Native Vegetation", "Cropland" — sums of raw classes, computed in the
+# MAgPIE app), in that app's own dropdown order (aggregates first/next to
+# their components, then forest -> other natural -> pasture/farming ->
+# non-vegetated). Not every class has a map for every year (e.g. Cotton (beta)
+# starts in 2000) — hist_map_file_exists() decides per year.
+HIST_MAPBIOMAS_CLASSES <- c(
+  "Native Vegetation", "Forest Formation", "Savanna Formation", "Mangrove",
+  "Floodable Forest", "Wooded Sandbank Vegetation", "Forest Plantation",
+  "Wetland", "Grassland", "Hypersaline Tidal Flat", "Rocky Outcrop",
+  "Herbaceous Sandbank Vegetation", "Beach", "Other non Vegetated Areas",
+  "Other non Forest Formations", "River", "Aquaculture", "Pasture",
+  "Cropland", "Soybean", "Sugar cane", "Rice", "Other Temporary Crops",
+  "Coffee", "Citrus", "Palm Oil", "Other Perennial Crops", "Cotton (beta)",
+  "Mosaic of Uses", "Urban Area", "Mining", "Photovoltaic Power Plant (beta)"
+)
+
+hist_map_rel_path <- function(source, class_name, year) {
+  if (source == "IBGE")
+    sprintf("IBGE/IBGE_Cropland_%s.png", year)
+  else
+    sprintf("Mapbiomas_C10/Mapbiomas_C10_%s_%s.png", gsub(" ", "_", class_name, fixed = TRUE), year)
+}
+
+hist_map_file_exists <- function(source, class_name, year)
+  file.exists(file.path("data/historical_maps", hist_map_rel_path(source, class_name, year)))
+
+# One switch per MapBiomas class — input id derived from the class name.
+hist_class_input_id <- function(class_name) paste0("hmap_cls_", make.names(class_name))
+
+# Year button-group CSS shared by the Maps tab (#map_*) and the Historical
+# Maps tab (#hmap_*) — the second copy is produced by gsub("#map_", "#hmap_").
+MAP_YEAR_CSS <- "
+  #map_year.shiny-input-container { margin-bottom: 0; }
+  #map_prev_year, #map_next_year {
+    font-size: 0.9rem !important;
+    line-height: 1.4;
+    padding: 5px 10px;
+  }
+  #map_year .shiny-options-group {
+    display: inline-flex !important;
+    border: 1.5px solid #007B8A;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #map_year .radio,
+  #map_year .radio-inline,
+  #map_year .form-check {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  #map_year input[type='radio'] {
+    position: absolute !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  #map_year label,
+  #map_year .form-check-label {
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block;
+  }
+  #map_year label span {
+    display: block;
+    padding: 5px 14px;
+    cursor: pointer;
+    background: white;
+    color: #007B8A;
+    font-weight: 500;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    line-height: 1.4;
+  }
+  #map_year label:hover span { background: #e0f2f4; }
+  #map_year input[type='radio']:checked + span {
+    background: #007B8A;
+    color: white;
+  }
+"
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 ui <- page_navbar(
@@ -1866,55 +1959,6 @@ ui <- page_navbar(
       .scen-group .shiny-input-container {
         margin-bottom: 2px;
       }
-      /* Maps tab — year button-group */
-      #map_year.shiny-input-container { margin-bottom: 0; }
-      #map_prev_year, #map_next_year {
-        font-size: 0.9rem !important;
-        line-height: 1.4;
-        padding: 5px 10px;
-      }
-      #map_year .shiny-options-group {
-        display: inline-flex !important;
-        border: 1.5px solid #007B8A;
-        border-radius: 4px;
-        overflow: hidden;
-      }
-      #map_year .radio,
-      #map_year .radio-inline,
-      #map_year .form-check {
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      #map_year input[type='radio'] {
-        position: absolute !important;
-        opacity: 0 !important;
-        width: 0 !important;
-        height: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      #map_year label,
-      #map_year .form-check-label {
-        margin: 0 !important;
-        padding: 0 !important;
-        display: block;
-      }
-      #map_year label span {
-        display: block;
-        padding: 5px 14px;
-        cursor: pointer;
-        background: white;
-        color: #007B8A;
-        font-weight: 500;
-        font-size: 0.9rem;
-        white-space: nowrap;
-        line-height: 1.4;
-      }
-      #map_year label:hover span { background: #e0f2f4; }
-      #map_year input[type='radio']:checked + span {
-        background: #007B8A;
-        color: white;
-      }
       /* Maps tab — images fit viewport */
       .maps-img {
         display: block;
@@ -1953,6 +1997,10 @@ ui <- page_navbar(
         display: flex; align-items: center; justify-content: center;
       }
     ")),
+    # Year button-group for the Maps tab (#map_*) and, identically, the
+    # Historical Maps tab (#hmap_*) — same rules, ids swapped via gsub().
+    tags$style(HTML(MAP_YEAR_CSS)),
+    tags$style(HTML(gsub("#map_", "#hmap_", MAP_YEAR_CSS, fixed = TRUE))),
     tags$script(HTML("
       // Icon-only Chart type dropdown (chart_type_ui()) — the real Shiny
       // input is a hidden radioButtons(); this just keeps the visible
@@ -2217,6 +2265,39 @@ ui <- page_navbar(
                        style = "padding:4px 10px; font-size:1rem;")
         ),
         uiOutput("maps_ui")
+      )
+    )
+  ),
+
+  nav_panel(HTML("🕰️ Historical Maps"),
+    layout_sidebar(
+      sidebar = sidebar(
+        div(class = "scen-group",
+            tags$label("Source", class = "control-label"),
+            input_switch("hmap_ibge",      "IBGE (Cropland)", value = TRUE),
+            input_switch("hmap_mapbiomas", "MapBiomas C10",   value = FALSE)),
+        conditionalPanel(
+          condition = "input.hmap_mapbiomas",
+          div(class = "scen-group",
+              tags$label("MapBiomas Classes", class = "control-label"),
+              lapply(HIST_MAPBIOMAS_CLASSES, function(cl)
+                input_switch(hist_class_input_id(cl), cl, value = cl == "Forest Formation")))
+        )
+      ),
+      tagList(
+        div(style = "display:flex; align-items:center; justify-content:center; gap:12px; padding:6px 0 10px 0;",
+          actionButton("hmap_prev_year", HTML("&#9664;"),
+                       class = "btn btn-primary btn-sm",
+                       style = "padding:4px 10px; font-size:1rem;"),
+          radioButtons("hmap_year", NULL,
+                       choices  = as.character(HIST_MAP_YEARS),
+                       selected = "2020",
+                       inline   = TRUE),
+          actionButton("hmap_next_year", HTML("&#9654;"),
+                       class = "btn btn-primary btn-sm",
+                       style = "padding:4px 10px; font-size:1rem;")
+        ),
+        uiOutput("hmap_ui")
       )
     )
   ),
@@ -2979,6 +3060,93 @@ server <- function(input, output, session) {
       column(4, tile2),
       column(4, diff_tile)
     )
+  })
+
+  # ── Historical Maps tab ───────────────────────────────────────────────────────
+  # Pre-made PNGs only (see HIST_MAP_* near the top of this file) — nothing is
+  # generated here. IBGE and MapBiomas are mutually exclusive: hmap_source()
+  # is the single source of truth for which one is active, and turning one
+  # switch on turns the other off (update_switch). Driving the render off
+  # hmap_source() rather than the raw switch inputs means there's never a
+  # frame where both are "on" while the second switch's update round-trips.
+  # IBGE is one Cropland tile; MapBiomas is one tile per class switched on.
+  hmap_years_vec <- as.character(HIST_MAP_YEARS)
+  hmap_source    <- reactiveVal("ibge")   # matches the switches' initial state
+
+  observeEvent(input$hmap_ibge, {
+    if (isTRUE(input$hmap_ibge)) {
+      hmap_source("ibge")
+      update_switch("hmap_mapbiomas", value = FALSE, session = session)
+    } else if (identical(hmap_source(), "ibge")) {
+      hmap_source(NULL)
+    }
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$hmap_mapbiomas, {
+    if (isTRUE(input$hmap_mapbiomas)) {
+      hmap_source("mapbiomas")
+      update_switch("hmap_ibge", value = FALSE, session = session)
+    } else if (identical(hmap_source(), "mapbiomas")) {
+      hmap_source(NULL)
+    }
+  }, ignoreInit = TRUE)
+
+  hmap_classes_sel <- reactive(
+    HIST_MAPBIOMAS_CLASSES[vapply(HIST_MAPBIOMAS_CLASSES,
+                                  function(cl) isTRUE(input[[hist_class_input_id(cl)]]),
+                                  logical(1))])
+
+  observeEvent(input$hmap_prev_year, {
+    idx <- which(hmap_years_vec == input$hmap_year)
+    if (idx > 1) updateRadioButtons(session, "hmap_year", selected = hmap_years_vec[idx - 1])
+  })
+
+  observeEvent(input$hmap_next_year, {
+    idx <- which(hmap_years_vec == input$hmap_year)
+    if (idx < length(hmap_years_vec))
+      updateRadioButtons(session, "hmap_year", selected = hmap_years_vec[idx + 1])
+  })
+
+  hist_map_tile <- function(source, class_name, year) {
+    if (hist_map_file_exists(source, class_name, year)) {
+      tags$img(src   = paste0("hist_maps/", hist_map_rel_path(source, class_name, year)),
+               class = "maps-img",
+               style = "border:1px solid #ddd; border-radius:4px;",
+               alt   = paste(source, class_name, year))
+    } else {
+      map_placeholder("&#x1F6AB;", "No map for this year",
+                      sprintf("%s has no \"%s\" map for %s.",
+                              if (source == "IBGE") "IBGE" else "MapBiomas C10",
+                              class_name, year))
+    }
+  }
+
+  output$hmap_ui <- renderUI({
+    year <- input$hmap_year
+    req(year)
+
+    src <- hmap_source()
+    if (is.null(src))
+      return(map_placeholder("", "Select a source",
+                             "Turn on IBGE or MapBiomas C10 in the sidebar."))
+
+    tiles <- if (src == "ibge") {
+      list(hist_map_tile("IBGE", "Cropland", year))
+    } else {
+      lapply(hmap_classes_sel(), function(cl) hist_map_tile("MapBiomas", cl, year))
+    }
+
+    if (length(tiles) == 0)
+      return(map_placeholder("", "Select a class",
+                             "Turn on at least one MapBiomas class in the sidebar."))
+
+    # Tile width adapts to how many maps are on screen: 1 -> one centred
+    # half-width map, 2 or 4 -> two per row (4 becomes a 2x2 rather than a
+    # row of four slivers), 3 or 5+ -> three per row, wrapping onto more rows.
+    n    <- length(tiles)
+    ncol <- if (n == 1) 1 else if (n %in% c(2, 4)) 2 else 3
+    fluidRow(lapply(tiles, function(t)
+      if (ncol == 1) column(6, offset = 3, t) else column(12 / ncol, t)))
   })
 
   make_luc_server(input, output, session)
