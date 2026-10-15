@@ -1,564 +1,185 @@
 # 🌿 FABLE Calculator — Scenario Comparison (Brazil)
 
-An interactive R Shiny app to compare any number of [FABLE Calculator](https://fableconsortium.org/tools/fablecalculators/) land-use scenarios for Brazil against observed historical data.
+An interactive app for exploring how Brazil's land use, agriculture and emissions could evolve up to 2050 under different scenarios — and how those scenarios compare with what has actually been observed since the 1990s.
 
-## 📋 Overview
+## 📋 What is this?
 
-The FABLE Calculator is a spreadsheet-based land-use modelling tool developed by the FABLE Consortium to explore national pathways toward sustainable food and land-use systems. This project reads any number of Brazil-specific scenario files (configured in `data/xlsx/scenarios.csv`) and overlays their outputs with historical reference data (2000–2020), enabling visual comparison across land-use classes and time periods.
+The [FABLE Calculator](https://fableconsortium.org/tools/fablecalculators/) is a modelling tool developed by the FABLE Consortium to explore pathways toward sustainable food and land-use systems. This app takes the Calculator's results for Brazil and lets you compare several scenarios side by side, next to observed historical data — without opening a single spreadsheet.
 
-The app ships with nine scenarios across five calibrations (UP51a, UP51, UP50, UP48, UP46) — UP51a/UP51/UP50/UP48 each with both pathways, UP46 currently only with Current Trends. UP51a is a revised UP51 with an updated land-use baseline (Mapbiomas Collection 10 + IBGE):
+Everything is interactive: switch scenarios on and off, hover over a chart for exact values, change the time window, and download any table.
 
-| Scenario | Description |
-|----------|-------------|
-| **UP51a - Current Trends** | Business-as-usual trajectory, UP51a calibration (revised land-use baseline) |
-| **UP51a - NDC Commitments** | Nationally Determined Contribution targets, UP51a calibration (revised land-use baseline) |
-| **UP51 - Current Trends** | Business-as-usual trajectory, UP51 calibration |
-| **UP51 - NDC Commitments** | Nationally Determined Contribution targets, UP51 calibration |
-| **UP50 - Current Trends** | Business-as-usual trajectory, UP50 calibration |
-| **UP50 - NDC Commitments** | Nationally Determined Contribution targets, UP50 calibration |
-| **UP48 - Current Trends** | Business-as-usual trajectory, UP48 calibration |
-| **UP48 - NDC Commitments** | Nationally Determined Contribution targets, UP48 calibration |
-| **UP46 - Current Trends** | Business-as-usual trajectory, UP46 calibration |
+### The scenarios
 
-Adding more scenarios (another UP calibration, another policy pathway, …) is just a new xlsx file plus a new row in `scenarios.csv` — no code changes needed. See [🗂️ Managing scenarios](#️-managing-scenarios) below.
+There are two kinds of pathway:
 
-## ⚙️ Requirements
+- **Current Trends** — business as usual: what happens if today's trends continue.
+- **NDC Commitments** — what happens if Brazil delivers on its climate commitments under the Paris Agreement (its *Nationally Determined Contribution*).
 
-R (≥ 4.1) with the following packages:
+Each pathway comes in several **calibrations** (UP46, UP48, UP50, UP51, UP51a). A calibration is a version of the model's setup, refined over time — a higher number means a more recent one. **UP51a is the newest**: it is UP51 with an updated land-use baseline (MapBiomas Collection 10 and IBGE).
 
-| Package | Purpose |
-|---------|---------|
-| `readxl` | Read FABLE Calculator Excel files |
-| `dplyr` | Data wrangling |
-| `tidyr` | Data reshaping |
-| `shiny` | Web app framework |
+| Calibration | Current Trends | NDC Commitments |
+|-------------|:--------------:|:---------------:|
+| UP51a | ✅ | ✅ |
+| UP51 | ✅ | ✅ |
+| UP50 | ✅ | ✅ |
+| UP48 | ✅ | ✅ |
+| UP46 | ✅ | — |
+
+When the app opens, only the newest calibration (UP51a) is switched on; every other scenario is one click away.
+
+### Quick glossary
+
+| Term | Meaning |
+|------|---------|
+| **Calibration** | The period (2000–2020) in which the model is checked against observed data. After 2020 the lines are projections. |
+| **Mha** | Million hectares |
+| **Mt** | Million tonnes |
+| **MtCO₂e** | Million tonnes of CO₂ equivalent — all greenhouse gases expressed in one common unit |
+| **AFOLU** | Agriculture, Forestry and Other Land Use |
+| **NDC** | Nationally Determined Contribution — a country's climate commitment under the Paris Agreement |
+
+## ⚙️ Requirements and installation
+
+The app runs on **R, version 4.1 or newer** (a free download from [r-project.org](https://www.r-project.org/); [RStudio](https://posit.co/download/rstudio-desktop/) is optional but handy). On top of R you need a few add-on packages, installed once:
+
+| Package | What it is used for |
+|---------|---------------------|
+| `shiny` | The web app itself |
+| `bslib` | The app's look and feel |
 | `plotly` | Interactive charts |
-| `bslib` | Bootstrap 5 theming |
-| `chorddiag` | Chord diagram widget (Land Use Change tab) |
-| `terra` | Raster processing and map generation |
-| `RColorBrewer` | Colour palettes for maps |
-| `ggplot2` | Static charts (report only) |
-| `officer` | Word document generation (report only) |
-| `flextable` | Formatted tables in Word (report only) |
+| `chorddiag` | The Chord diagram on the Land Use Change tab |
+| `readxl` | Reading the FABLE Calculator Excel files |
+| `dplyr`, `tidyr` | Preparing the data |
+| `terra`, `RColorBrewer` | Building the Maps tab's maps |
+| `ggplot2`, `officer`, `flextable` | Only for the optional Word report |
 
-Install all at once from the R console:
+Paste this into the R console (the last line installs `chorddiag`, which is only available from GitHub):
 
 ```r
 install.packages(c("readxl", "dplyr", "tidyr", "shiny", "plotly", "bslib",
-                   "terra", "RColorBrewer",
-                   "ggplot2", "officer", "flextable"))
-remotes::install_github("mattflor/chorddiag")  # GitHub-only, not on CRAN
+                   "terra", "RColorBrewer", "ggplot2", "officer", "flextable"))
+remotes::install_github("mattflor/chorddiag")
 ```
 
-## ▶️ One-click launchers
-
-Double-click the file for your operating system to start the app directly — no terminal needed:
-
-| OS | File | Notes |
-|----|------|-------|
-| **Windows** | `open_app_windows.bat` | Double-click in File Explorer |
-| **macOS** | `open_app_mac.command` | First time: right-click → Open (Gatekeeper). After that, double-click works. If it still doesn't run, open a terminal in the project folder and run `chmod +x open_app_mac.command` once. |
-| **Ubuntu** | `open_app_ubuntu.sh` | In Nautilus: Edit → Preferences → Behaviour → "Run executable text files when they are opened". Then double-click. Alternatively, right-click → Run as a Program. If needed, run `chmod +x open_app_ubuntu.sh` once in a terminal first. |
-
-All three launchers auto-detect their own location and open the browser automatically on first run. If the downscaling maps have not been generated yet, the launcher runs `04_generate_maps.R` automatically before opening the app (this takes a few minutes on first run).
-
-## 📂 Input data files
-
-| File | Location | Description |
-|------|----------|-------------|
-| Scenario metadata | `data/xlsx/scenarios.csv` | Maps each xlsx file to its display label — the single source of truth for which scenarios exist and in what order (see [🗂️ Managing scenarios](#️-managing-scenarios)) |
-| FABLE Calculator spreadsheet(s) | `data/xlsx/` | One `.xlsx` per scenario listed in `scenarios.csv` |
-| Historical reference data | `data/csv/` | Long-format CSV (`histdatabrazil.csv`) with observed data for Brazil |
-| LUC transition matrix | `data/luc/` | Downscaled land-use change data per scenario, `downscaled_LUC_UP<n>_<ct|ndc>.rds` (matched case-insensitively — `ct`/`ndc` or `CT`/`NDC` both work) — exists for UP50 (both pathways), UP48 and UP46 (Current Trends only) |
-| Cell ID raster | `data/luc/` | `id_raster.tif` — maps FABLE cell IDs to a 0.05° raster grid |
-| State and biome boundaries | `data/shapefiles/` | `br_states.shp`, `br_biomes.shp` — shapefile overlays for maps |
-| Historical map PNGs | `data/historical_maps/` | Pre-made IBGE and MapBiomas C10 land-use maps (1995–2020) for the Historical Maps tab, copied as-is from the MAgPIE scenario viewer — committed to git, not generated by this repo |
-
-> ⚠️ **Maps data availability lags the other tabs:** the Maps tab now lets you pick any 2 scenarios from `scenarios.csv` (capped at 2, see [🌎 Shiny app — Maps tab](#-shiny-app--maps-tab)), but downscaled raster data currently only exists for UP51a (both pathways), UP50 (both pathways), UP48, and UP46 (Current Trends only for the latter two) — other scenarios/pathways (e.g. plain UP51, or an NDC that may never get downscaled data) show a "Map data not available" placeholder rather than the actionable "not generated yet" one, since simply rerunning `04_generate_maps.R` can't produce data that doesn't exist.
-
-## 🗂️ Managing scenarios
-
-`data/xlsx/scenarios.csv` drives everything: which xlsx files get read, what they're labelled in the UI, and the order they appear in (switches, legend, table rows, chart colours are all assigned in this row order).
-
-```csv
-file,label,up
-FABLECalculator_BRA_UP51a_CurrentTrends.xlsx,UP51a - Current Trends,51.1
-FABLECalculator_BRA_UP51a_NDC.xlsx,UP51a - NDC Commitments,51.1
-FABLECalculator_BRA_UP51_CurrentTrends.xlsx,UP51 - Current Trends,51
-FABLECalculator_BRA_UP51_NDC.xlsx,UP51 - NDC Commitments,51
-FABLECalculator_BRA_UP50_CurrentTrends.xlsx,UP50 - Current Trends,50
-FABLECalculator_BRA_UP50_NDC.xlsx,UP50 - NDC Commitments,50
-FABLECalculator_BRA_UP48_CurrentTrends.xlsx,UP48 - Current Trends,48
-FABLECalculator_BRA_UP48_NDC.xlsx,UP48 - NDC Commitments,48
-FABLECalculator_BRA_UP46_CurrentTrends.xlsx,UP46 - Current Trends,46
-```
-
-**To add a scenario:** drop the new `.xlsx` file into `data/xlsx/` and add a row to `scenarios.csv` with its filename and display label. The app detects the change automatically on next launch and reprocesses if needed — no need to delete `data/processed/` by hand, though doing so also works. This also covers **editing an existing scenario's xlsx in place** (same filename/label, just corrected data) — the app compares each source file's modification time against the cache and reprocesses if any xlsx, `scenarios.csv`, or `histdatabrazil.csv` is newer. Any number of scenarios can be selected at once via the **Scenario** switches on each tab.
-
-**Default-on scenarios:** the optional `up` column controls which switches start checked — only the rows with the *highest* `up` value default to on (currently the two UP51a rows); everything else starts off but is still selectable. Adding a new, higher-numbered UP row automatically becomes the new default the next time the app launches, no code changes needed. Omitting the `up` column entirely makes every scenario default to checked. `up` doesn't need to be a whole number — a revised calibration that supersedes an existing UP (like UP51a superseding UP51) can use a decimal (`51.1`) to rank above it without colliding.
-
-**Switches stay in sync across tabs:** toggling a scenario on or off on any tab (Land Use, Land Use Change, Emissions, Crops, Livestock, Trade, Food, Transition Matrix) applies the same change everywhere else — there's one shared selection, not eight independent ones.
-
-## 📁 Repository structure
-
-```
-fable-scenario-comparison-brazil/
-├── data/
-│   ├── csv/
-│   │   └── histdatabrazil.csv               # Historical observations (1995–2020)
-│   ├── images/
-│   │   ├── fable_logo.png                   # Navbar logo
-│   │   ├── fcidlogo.png                     # FCID logo (pinned right of navbar)
-│   │   └── favicon.svg                      # Browser tab icon (Brazil flag)
-│   ├── luc/
-│   │   ├── downscaled_LUC_UP50_ct.rds       # LUC transition matrix — Current Trends
-│   │   ├── downscaled_LUC_UP50_ndc.rds      # LUC transition matrix — NDC Commitments
-│   │   └── id_raster.tif                    # Cell ID raster (0.05° resolution)
-│   ├── maps/                                # Auto-generated PNGs (gitignored)
-│   │   ├── UP50_ct/
-│   │   │   ├── landcover/
-│   │   │   └── transitions/
-│   │   ├── UP50_ndc/
-│   │   │   ├── landcover/
-│   │   │   └── transitions/
-│   │   └── diff/
-│   │       └── UP50/
-│   │           ├── landcover/
-│   │           └── transitions/
-│   ├── historical_maps/                     # Pre-made PNGs for the Historical Maps tab (tracked)
-│   │   ├── IBGE/                            # Cropland, 1995–2020
-│   │   └── Mapbiomas_C10/                   # 32 classes, 1995–2020
-│   ├── shapefiles/
-│   │   ├── br_states.shp                    # Brazilian state boundaries
-│   │   └── br_biomes.shp                    # Brazilian biome boundaries
-│   └── xlsx/
-│       ├── scenarios.csv                       # Scenario file → label mapping (drives everything)
-│       ├── FABLECalculator_BRA_UP50_CurrentTrends.xlsx
-│       └── FABLECalculator_BRA_UP50_NDC.xlsx
-├── 01_process_data.R                        # Data ingestion and processing
-├── 02_shiny_app.R                           # Shiny app logic
-├── 03_generate_report.R                     # Word report generator
-├── 04_generate_maps.R                       # PNG map generator (downscaling)
-├── app.R                                    # Entry point (sources 02_shiny_app.R)
-├── open_app_windows.bat                     # Windows one-click launcher
-├── open_app_mac.command                     # macOS one-click launcher
-├── open_app_ubuntu.sh                       # Ubuntu one-click launcher
-└── README.md
-```
+The launchers below do not install packages for you, so do this step first.
 
-## 🗄️ Data sources
+## ▶️ Opening the app
 
-### Historical data (`histdatabrazil.csv`)
+Double-click the file for your computer — no terminal needed. The app opens in your web browser.
 
-Long-format CSV with columns `type`, `source`, `year`, `value`, `unit`. Coverage: 1995–2020 (5-year steps); Trade's MAPA rows additionally cover 2025/2030/2035.
+| System | File |
+|--------|------|
+| **Windows** | `open_app_windows.bat` |
+| **macOS** | `open_app_mac.command` (first time: right-click → Open) |
+| **Ubuntu** | `open_app_ubuntu.sh` |
 
-| Category | Variables | Source |
-|----------|-----------|--------|
-| Land use | Forest, Cropland, Pastures, Secondary Forest, Urban, Other Land | MapBiomas, LAPIG, IBGE |
-| Crop area | Soybean, Maize, Sugarcane, Permanent Crops | IBGE |
-| Production | Beef, Milk, Chicken, Pork, Cattle Herd, Soybean, Maize, Sugarcane, Forest Products | IBGE (FAOSTAT also kept as reference) |
-| Trade | Soybean (all/grain/cake/oil), Corn, Beef exports; Wheat imports | Comex (historical); MAPA (2025–2035 projections) |
-| Emissions | CO₂, CH₄, N₂O (AFOLU, enteric fermentation, crop residues, etc.) | SEEG v13 |
+The very first launch prepares the data and maps, which can take a few minutes. After that it opens quickly.
 
-### Scenario data (`xlsx/`)
+## 🧭 A tour of the app
 
-Two tables are read from the `SCENATHON_report` sheet:
+The app has ten tabs along the top. On each one, the controls are in the panel on the left.
 
-- **Aggregate table** (header row 11, `skip = 10`) — one row per 5-year time step (2000–2050), wide format with land-use, emissions and other aggregate variables.
-- **Crop table** (header row 29, `skip = 28`) — long format with columns `Product`, `Year`, `ProdQ_feas` (production, 1000 t) and `FeasHarvarea` (harvested area, 1000 ha), one row per product per year.
+**Controls you will see on most tabs**
 
-## 📄 Word report
+- **Scenario** — one on/off switch per scenario. Any number can be on at the same time. The selection is shared between the chart tabs, so a scenario you switch on in one tab is on in the others too. *(The two map tabs have their own controls.)*
+- **Years** — the **Calibration Only** switch shows 2000–2020 (model vs. observed data); off shows the full 2000–2050.
+- **Chart type** — the small icon button switches between line, bar and area charts.
+- **Start y-axis at zero** — tick it to start the vertical axis at zero, untick it to zoom in on the data.
+- **CSV** — the button next to a table downloads exactly what is on screen.
 
-`03_generate_report.R` generates a static Word document (`FABLE_Report_BRA_v50.docx`) with:
+### 🌿 Land Use
 
-- **Cover page** — title, subtitle, date
-- **Table of Contents** — auto-generated Word TOC field (update with Ctrl+A → F9 in Word)
-- **32 content pages** (landscape, one per variable) — each contains a line chart comparing Current Trends vs NDC Commitments (+ Historical where available), followed by a values table for 2000–2050
+How much land each class occupies over time: **Cropland, Pasture, Forest, Other Land and Urban**. Each selected scenario is drawn as a line, with the observed historical series on top (black).
 
-Sections: Land Use (5) · Emissions (4) · Crops (9) · Livestock (6) · Trade (7) · Food (1)
+When you tick **Calibration Only**, two extra tables appear showing how far each scenario is from the observed data — in absolute terms and as a percentage. The percentage is colour-coded: <font color="#009C3B">**green**</font> up to 10% off, <font color="#cc6600">**orange**</font> up to 20%, <font color="#cc0000">**red**</font> beyond that.
 
-Run from the project root:
+*Other Land* includes land that was recently converted to "other" uses, so it can grow substantially in the projections.
 
-```r
-source("03_generate_report.R")
-```
+### 🔄 Land Use Change
 
-Or from the terminal:
+Instead of how much land each class has, this tab shows **where land moves to**. Pick a period with the slider and a diagram type:
 
-```bash
-Rscript 03_generate_report.R
-```
+- **Sankey** *(default)* — a flow diagram: classes on the left at the start of the period, on the right at the end, with a ribbon for every conversion.
+- **Chord** — a circular diagram where each class is an arc and each conversion a band between arcs.
+- **Stacked Bar** — one bar per 5 years showing the net gain (above zero) or loss (below zero) of each class.
 
-Requires `ggplot2`, `officer`, and `flextable` in addition to the packages used by the Shiny app.
+Sankey and Chord also show land that **stayed** in its class, so you can see each class's full starting area and not only the part that changed. One diagram is shown per selected scenario.
 
-## 📥 Downloading data
+### 🌫️ Emissions
 
-Every tab has a **CSV** button next to the values table header. Clicking it downloads the currently displayed table (selected variable, scenario, and year range) as a `.csv` file. The filename encodes the current selection, e.g. `landuse_Forest_All_2050.csv` when every scenario is selected, or `landuse_Forest_Current_Trends_2050.csv` for a single one.
+Greenhouse-gas emissions from agriculture and land use, in MtCO₂e: **CO₂ from AFOLU, methane from cattle digestion, methane from rice, and nitrous oxide from agriculture**. Observed emissions come from SEEG (Brazil's national emissions estimates).
 
-## 🚀 Usage
+CO₂ AFOLU starts in 2005, and it can go **below zero** when forests and land absorb more carbon than is emitted (a net carbon sink) — in that case a dashed line marks zero.
 
-**Terminal (one command)**
+### 🌾 Crops
 
-```bash
-Rscript app.R
-```
+**Soybeans, Corn and Sugarcane** — choose whether to see **Area** (Mha), **Production** (Mt) or **Yield** (tonnes per hectare). Observed data come from IBGE.
 
-Or use one of the one-click launchers (`open_app_windows.bat`, `open_app_mac.command`, `open_app_ubuntu.sh`). All work from any directory — the app auto-detects its own location and opens the browser automatically.
+### 🐄 Livestock
 
-**RStudio**
+**Beef, Milk, Chicken and Pork production** (Mt), the **Cattle Herd** (million head) and the **Cattle Stocking Rate** (livestock units per hectare). Observed data come from IBGE; the stocking rate has no observed series, so only the scenarios are shown.
 
-Double-click `HistoricalComparisons.Rproj`, then run `shiny::runApp()` in the console, or open `app.R` and click the **Run App** button.
+### 🚢 Trade
 
-On first run, `01_process_data.R` executes automatically and saves processed files to `data/processed/`. Subsequent launches load from cache.
+**Exports** (soybeans — in total, as grain, cake or oil —, corn and beef) and **Imports** (wheat), in Mt. Observed data come from Comex, Brazil's official foreign-trade statistics.
 
-To force a full re-read of the source files:
+When you look all the way to 2050, a separate series of salmon-coloured diamonds shows the **Ministry of Agriculture's (MAPA) own projections** for 2025, 2030 and 2035, plus a 2050 point extended from that trend (marked as an extrapolation when you hover over it). These are forecasts, not observations, so they are kept apart from the historical line.
 
-```r
-source("01_process_data.R")
-```
+### 🍽️ Food
 
-## 🎨 UI theme
+Average **food consumption** per person (kilocalories per person per day) for each scenario.
 
-The app uses **Bootstrap 5** via the `bslib` package. The navbar displays in two rows — app title on the first line and tab names on the second. The navbar background is a five-stop Brazil flag gradient (`#2E7D32 → #C8A000 → #002776 → #C8A000 → #2E7D32`) with white text and a subtle drop shadow. The FCID logo is pinned to the right of the navbar spanning both rows. The title uses **Raleway** (bold) and the tab labels use **Montserrat** (medium), both loaded from Google Fonts. Interactive elements (active tabs, focused inputs, buttons) use the turquoise accent (`#007B8A`).
+### 🔁 Transition Matrix
 
-Controls are grouped in a **sidebar panel** on the left of each tab. **Scenario** is shown as one on/off switch per scenario (any number can be selected at once); **Years** is a single "Calibration Only" switch (off = 2000–2050, on = 2000–2020); **Chart type** is an icon-only dropdown button (line/bar/area icons) rather than a text-labelled radio group; the variable selector (land-use class, emission type, crop, etc.) uses a dropdown. Sidebar labels are bold without trailing colons. A **Start y-axis at zero** checkbox controls whether the y-axis is forced to start at zero (checked by default) or auto-scaled to the data range. For CO₂ AFOLU, the checkbox is unchecked by default and resets automatically when switching to that emission, since its values can be negative.
+Another way to read land-use change: a **grid of "from → to"**. Each row is what the land was at the start of the period, each column is what it became, and each cell is how much area (Mha) moved between the two. The darker the cell, the more land moved.
 
-All tabs support three **Chart types**:
+The diagonal (land that did not change) is left blank, crossed by a "/", so only real change shows. Transitions the model does not allow appear as 0.
 
-| Type | Description |
-|------|-------------|
-| **Line chart** | Lines with markers; one colour per scenario (assigned automatically from a fixed palette, in `scenarios.csv` order); historical in black |
-| **Bar chart** | Grouped bars with black border; historical in near-black (`#1a1a1a`) |
-| **Area chart** | Filled area to y = 0; semi-transparent fill (25% opacity) in scenario colours; black border line; historical as dashed black line without fill |
+One grid is shown per selected scenario, and **all grids use the same colour scale** — so shades can be compared directly between scenarios, and the scale updates automatically as you add or remove a scenario or move the period slider.
 
-## 📊 Shiny app — Land Use tab
+### 🌎 Maps
 
-The controls are displayed in this order:
+Maps of **where** land-use change happens across Brazil, for the scenarios that have been spatially downscaled (currently UP51a, UP50, UP48 and UP46 — UP48 and UP46 for Current Trends only).
 
-| Control | Type | Options |
-|---------|------|---------|
-| **Landuse Class** | Dropdown | Cropland · Pasture · Forest · Other Land · Urban |
-| **Scenario** | Switches | One per scenario in `scenarios.csv`; any number on at once |
-| **Years** | Switch | "Calibration Only" — off = 2000–2050, on = 2000–2020 |
-| **Chart type** | Icon dropdown | Line chart · Bar chart · Area chart |
+- **Map Type** — *Land Cover* (area of a class in each year), *Outflows* (area lost by a class) or *Transitions* (area converted from one class to another).
+- **Scenario** — choose up to two. When both belong to the same calibration, a third map shows the **difference** between them (blue = the second scenario has more, red = less).
+- **Year** — 2020 to 2050, using the `◀` `▶` buttons or the year bar.
 
-**Other Land** = `CalcOtherLand` + `NewOtherLand` from the Calculator (the latter is land recently converted to "other" that hasn't aged into the mature total yet — it can exceed `CalcOtherLand` itself by 2050). Every other class reads a single Calculator column.
+On Land Cover maps, each scenario's header also shows the FABLE Calculator's own national total for that class and year, as a quick check on the map.
 
-### Layout
+### 🕰️ Historical Maps
 
-The chart always appears on the left. The data table position depends on the Years selection:
+Maps of what has actually been **observed** in Brazil — not scenario results — from **IBGE** (cropland) and **MapBiomas Collection 10** (land cover). The maps were converted to a 0.5° grid.
 
-- **Calibration & Projections** — table appears below the chart at full width, so all years (2000–2050) are visible without horizontal scrolling
-- **Calibration** — table appears to the right of the chart (2000–2020 fits comfortably in the available space)
+- **Source** — choose **IBGE** (which shows Cropland) or **MapBiomas C10**, one at a time. The tab opens on IBGE.
+- **MapBiomas classes** — once MapBiomas is selected, a switch appears for each of its 32 classes. **Forest Formation** is shown first; switch on more classes to see them side by side. The maps resize to fit however many you choose.
+- **Timeline** — 1995 to 2020, every 5 years. Some classes did not exist in every year (cotton only from 2000, for example); those years say so instead of showing a map.
 
-### Chart behaviour
+## 📚 Where the historical data come from
 
-- One chart with a series per **selected** scenario overlaid (plus Historical) — toggling switches on/off adds or removes traces live
-- All selected scenarios always share the same y-axis scale for direct comparison
-- Hover over any point or bar to see the exact value (2 decimal places)
-- Dashed vertical line at 2020 marks the calibration / projection boundary (line chart only, Calibration & Projections mode)
-
-### Bar chart
-
-When **Bar chart** is selected, bars are grouped by year with the same colour scheme as the line chart:
-
-| Series | Fill | Border |
-|--------|------|--------|
-| Each scenario | Assigned from the palette, in `scenarios.csv` order (1st = Blue `#1565C0`, 2nd = Green `#009C3B`, …) | Black |
-| Historical | Near-black `#1a1a1a` | Black |
-
-### Data tables (right panel)
-
-The right panel always shows a **values table** with years as columns and one row per selected series (scenarios + historical). Historical values are left blank for years after 2020.
-
-When **Calibration (2000–2020)** is selected, two additional tables appear beneath the values table:
-
-| Table | Content |
-|-------|---------|
-| **Absolute Difference** | `abs(scenario − historical)` for each year, in the same unit as the chart (e.g. Mha) |
-| **Relative Difference (%)** | `(scenario − historical) / historical × 100` for each year |
-
-All values are shown with 2 decimal places. If historical data is unavailable for a given year, the difference cells are left blank.
-
-Values in the **Relative Difference** table are colour-coded by magnitude:
-
-| Range | Colour |
+| Topic | Source |
 |-------|--------|
-| \|val\| ≤ 10% | <font color="#009C3B">**Green**</font> |
-| 10% < \|val\| ≤ 20% | <font color="#cc6600">**Orange**</font> |
-| \|val\| > 20% | <font color="#cc0000">**Red**</font> |
+| Land use | MapBiomas, LAPIG, IBGE |
+| Crop area and production | IBGE |
+| Livestock | IBGE |
+| Trade | Comex (observed) · MAPA (projections to 2035) |
+| Emissions | SEEG |
 
-### Visual encoding (line chart)
+## 🔧 For maintainers
 
-| Series | Colour |
-|--------|--------|
-| Each scenario | Assigned from the palette, in `scenarios.csv` order (1st = Blue `#1565C0`, 2nd = Green `#009C3B`, 3rd = Orange `#E65100`, …) |
-| Historical | Black `#000000` |
+**Launchers on macOS/Ubuntu.** If a launcher won't run, make it executable once from a terminal in the project folder (`chmod +x open_app_mac.command` or `chmod +x open_app_ubuntu.sh`).
 
-## 🔄 Shiny app — Land Use Change tab
+**Running without the launchers.** From the project folder: `Rscript app.R`, or open the project in RStudio and click *Run App*. On the first run the app reads the spreadsheets and caches the results in `data/processed/`; it refreshes that cache by itself whenever a source file changes.
 
-Visualizes gross land-cover *conversions* between classes — not the class totals the Land Use tab shows, but who-converted-to-what. Three diagram types, one panel per selected scenario, side by side (up to 3 per row, wrapping to further rows beyond that):
+**Adding a scenario.** Put the new `.xlsx` in `data/xlsx/` and add one row to `data/xlsx/scenarios.csv` (`file`, `label`, and an optional `up` number — only the highest `up` starts switched on; a revision of an existing calibration can use a decimal such as `51.1`). No code changes are needed, and the row order sets the display order and colours.
 
-| Control | Options |
-|---------|---------|
-| **Scenario** | One switch per scenario in `scenarios.csv`; shared with every other tab (toggling here affects, and is affected by, all other tabs) |
-| **Period** | Slider, 2000–2050, default 2020–2050 (hidden for Stacked Bar — see below) |
-| **Diagram type** | Icon dropdown — Sankey (default) · Chord · Stacked Bar |
+**Map data.**
+- The *Maps* tab reads PNGs that `04_generate_maps.R` builds from the downscaled files in `data/luc/` (`downscaled_LUC_UP<n>_<ct|ndc>.rds`). The launchers run it automatically the first time; to rerun by hand: `Rscript 04_generate_maps.R`. Scenarios without a downscaled file simply show "Map data not available".
+- The *Historical Maps* tab reads the ready-made PNGs in `data/historical_maps/` (copied from the MAgPIE scenario viewer; they are not generated here).
 
-- **Chord** — a circular diagram; each class is an arc, each conversion an inner band (coloured and tapered by source class).
-- **Sankey** — a flow diagram; classes on the left (start of the Period window) and right (end), one link per conversion.
-- **Stacked Bar** — one bar per 5-year period, one coloured segment per class, showing that period's net change (gains above zero, losses below); always shows the full 2005–2050 trajectory regardless of the Period slider (hence the slider hides for this mode). A shared class-colour legend is shown once above the whole row of scenario panels rather than repeated per panel.
+**Historical observations** live in `data/csv/histdatabrazil.csv` (`type`, `source`, `year`, `value`, `unit`).
 
-Both Chord and Sankey also draw one extra segment per class — "stayed as X" — sized to that class's *remaining* area after subtracting everything that converted away, so the diagram reflects each class's full starting stock, not just the part that changed.
-
-### Classes and colours
-
-| Class | Colour |
-|-------|--------|
-| Forest | `#1B5E20` (dark green) |
-| NewForest | `#A5D6A7` (light green) |
-| Cropland | `#F4B400` (yellow) |
-| Pasture | `#5E35B1` (purple) |
-| OtherLand | `#8D6E63` (brown) |
-| Urban | `#757575` (grey) |
-
-`NewForest` tracks recently-afforested area — it's zero throughout in a Current Trends scenario but can grow substantially under an NDC/afforestation-policy scenario, so it's shown like any other class rather than hidden.
-
-### Data source
-
-Two tables inside each scenario's xlsx, read once by `01_process_data.R`:
-
-| Table | Sheet | Used for |
-|-------|-------|----------|
-| `calc_landmatrix` | `4_calc_land` | Chord and Sankey — the from→to conversion matrix (6 classes × 10 five-year periods), plus starting-stock area for the "stayed as X" calculation |
-| `ResultsLand` | `LAND` | Stacked Bar — land-cover stock by year, converted to period-over-period net change |
-
-No historical comparison and no CSV download on this tab — both diagram types are purely a scenario-to-scenario (and period-to-period) comparison, with no equivalent historical land-transition data to overlay.
-
-## 🌾 Shiny app — Crops tab
-
-| Control | Options |
-|---------|---------|
-| **Crop** | Soybeans · Corn · Sugarcane |
-| **Type** | Area · Production · Yield |
-| **Scenario** | One switch per scenario in `scenarios.csv`; any number on at once |
-| **Years** | "Calibration Only" switch — off = 2000–2050, on = 2000–2020 |
-| **Chart type** | Icon dropdown — Line chart · Bar chart · Area chart |
-
-### Metrics
-
-| Type | Source | Unit | Notes |
-|------|--------|------|-------|
-| Area | `FeasHarvarea` (FABLE crop table) | Mha | Converted from 1 000 ha |
-| Production | `ProdQ_feas` (FABLE crop table) | Mt | Converted from 1 000 t |
-| Yield | Derived | t/ha | Production (Mt) ÷ Area (Mha) |
-
-Historical reference comes from `histdatabrazil.csv` (IBGE). Layout, chart behaviour, data tables and colour encoding are identical to the Land-use tab, with the y-axis label updating per metric (Area (Mha) · Production (Mt) · Yield (t/ha)).
-
-## 🌫️ Shiny app — Emissions tab
-
-| Control | Options |
-|---------|---------|
-| **Emission** | CO2 AFOLU · CH4 Enteric Fermentation · CH4 Rice · N2O from Agriculture |
-| **Scenario** | One switch per scenario in `scenarios.csv`; any number on at once |
-| **Years** | "Calibration Only" switch — off = 2000–2050, on = 2000–2020 |
-| **Chart type** | Icon dropdown — Line chart · Bar chart · Area chart |
-
-All values are in **MtCO2e**. Historical data from SEEG v13 is reported in million tonnes of the respective gas and converted to CO2e using IPCC AR6 GWP100 factors. FABLE Calculator columns are already in MtCO2e.
-
-### Emission types — source mapping
-
-| Emission | FABLE Calculator | Historical (SEEG v13) | Conversion |
-|----------|------------------|-----------------------|------------|
-| **CO₂ AFOLU** | `CalcAllLandCO2e` | `CO2 AFOLU` | × 1 (already CO2e) |
-| **CH₄ Enteric Fermentation** | `CalcLiveCH4` | `CH4 Enteric Fermentation` | × 27.2 (GWP100 AR6) |
-| **CH₄ Rice** | `CalcCropCH4` | `CH4 Rice` | × 27.2 (GWP100 AR6) |
-| **N₂O from Agriculture** | `CalcLiveN2O` + `CalcCropN2O` | Sum of 8 subcategories (see below) | × 273 (GWP100 AR6) |
-
-#### N2O from Agriculture — aggregation
-
-The FABLE Calculator value is the **sum of two columns**: `CalcLiveN2O` (livestock N2O) and `CalcCropN2O` (crop N2O), both already in MtCO2e.
-
-The historical series aggregates the following SEEG v13 subcategories and multiplies the total by 273:
-
-- N2O Animal Waste Management
-- N2O Burning of Crop Residues
-- N2O Decay of Crop Residues
-- N2O Inorganic Fertilizers
-- N2O Manure Applied to Croplands
-- N2O Pasture
-- N2O Peatland
-- N2O Soil Organic Matter Loss
-
-#### Note on CO2 AFOLU time range and negative values
-
-Charts and tables for **CO2 AFOLU start at 2005** (not 2000). The Calculator reports a value of 0 for the year 2000 in this column, which reflects a model calibration boundary rather than an observed or projected emission, so that data point is suppressed.
-
-CO2 AFOLU values can go negative (net carbon sink). When they do, the y-axis extends below zero and a dashed horizontal line is drawn at y = 0 for reference. This zero line is shown only on the CO2 AFOLU chart.
-
-## 🐄 Shiny app — Livestock tab
-
-| Control | Options |
-|---------|---------|
-| **Product** | Beef · Milk · Chicken · Pork |
-| **Scenario** | One switch per scenario in `scenarios.csv`; any number on at once |
-| **Years** | "Calibration Only" switch — off = 2000–2050, on = 2000–2020 |
-| **Chart type** | Icon dropdown — Line chart · Bar chart · Area chart |
-
-All values are in **Mt** (million tonnes). Source: `ProdQ_feas` column from the FABLE crop table, converted from 1 000 t.
-
-### Historical reference
-
-All four products now have a historical series (IBGE) — Calibration mode shows the Historical row plus Absolute/Relative Difference tables for all of them.
-
-| Product | FABLE product | Historical source |
-|---------|--------------|-------------------|
-| Beef | `beef` | Beef Production — IBGE |
-| Milk | `milk` | Milk Production — IBGE |
-| Chicken | `chicken` | Chicken Production — IBGE |
-| Pork | `pork` | Pork Production — IBGE |
-
-## 🚢 Shiny app — Trade tab
-
-| Control | Options |
-|---------|---------|
-| **Type** | Exports · Imports |
-| **Product** | Depends on Type (see below) |
-| **Scenario** | One switch per scenario in `scenarios.csv`; any number on at once |
-| **Years** | "Calibration Only" switch — off = 2000–2050, on = 2000–2020 |
-| **Chart type** | Icon dropdown — Line chart · Bar chart · Area chart |
-
-The Product selector updates automatically when Type changes. All values are in **Mt** (million tonnes), converted from the `Export_quantity` / `Import_quantity` columns in the FABLE crop table (1 000 t).
-
-### Historical reference and MAPA projections
-
-Every product now has a historical series (**Comex**, Brazil's official foreign-trade statistics, 1995–2020) — Calibration mode shows the Historical row plus Absolute/Relative Difference tables, same as the other tabs.
-
-In "Calibration & Projections" mode (x-axis to 2050), every product also shows a separate **"Projections (MAPA)"** series — translucent salmon diamond markers distinct from both the historical line and the FABLE scenario lines. These are forward-looking projections, not historical observations, so they're never labelled "Historical" or merged into that series. Three of the points (2025, 2030, 2035) are Brazil's Ministry of Agriculture's own published projections; a fourth point at **2050** is a linear extrapolation of that trend (fit through all three real points, so it reflects the growth rate across both the 2025→2030 and 2030→2035 intervals) — its hover text notes it's extrapolated, to distinguish it from MAPA's own published figures. "Soybeans (all)" has no combined-product MAPA projection of its own, so its series is the sum of the Soybeans (grain), (cake), and (oil) MAPA projections for each year.
-
-### Products per type
-
-| Type | Products | FABLE product key(s) |
-|------|----------|----------------------|
-| Exports | Soybeans (all) | `soyabean` + `soycake` + `soyoil` (sum) |
-| Exports | Soybeans (grain) | `soyabean` |
-| Exports | Soybeans (cake) | `soycake` |
-| Exports | Soybeans (oil) | `soyoil` |
-| Exports | Corn | `corn` |
-| Exports | Beef | `beef` |
-| Imports | Wheat | `wheat` |
-
-## 🐄 Shiny app — Livestock tab (additional variables)
-
-In addition to production (Mt) for Beef, Milk, Chicken and Pork, the Livestock tab includes two cattle-specific variables sourced from the `5_feas_livestock` sheet:
-
-| Variable | Source column | Unit | Data source |
-|----------|--------------|------|-------------|
-| Cattle Herd | `FeasHerd` | Million head | `5_feas_livestock`, cattle rows summed (BOVO + BOVD), converted from 1 000 head — historical series: Cattle Herd, IBGE |
-| Cattle Stocking Rate | `RumDensity` | TLU/ha | `5_feas_livestock`, cattle rows (same value across sub-types, first taken) |
-
-Cattle Herd now has a historical series (IBGE) and shows the full Calibration-mode difference tables. Cattle Stocking Rate has no historical series — the chart shows scenario lines only with no difference tables.
-
-## 🌎 Shiny app — Maps tab
-
-Displays static PNG maps generated from the FABLE downscaling model. Like the other tabs, scenarios are picked via switches — but **only scenarios with downscaled map data get a switch at all** (unlike every other tab, which shows all of `scenarios.csv`), and selection is **capped at exactly 2 at once**, since this tab shows a left/right pair plus a difference map (a diff only makes sense between 2 scenarios). Turning on a 3rd switch reverts it automatically with a short notice. These switches are independent of every other tab's — toggling a scenario here doesn't affect (and isn't affected by) Land Use, Emissions, etc. **Defaults to whichever UP calibration currently has both Current Trends and NDC downscaled (today, UP50)** rather than the newest UP overall, so the tab opens showing real maps instead of "not available" placeholders.
-
-| Control | Options |
-|---------|---------|
-| **Map Type** | Land Cover · Outflows · Transitions |
-| **Scenario** | Any 2 scenarios that have downscaled map data (switches, capped at 2) |
-| **Class / Transition** | Depends on Map Type (see below) |
-| **Year** | 2020 · 2025 · 2030 · 2035 · 2040 · 2045 · 2050 |
-
-The year selector appears as a navigation bar above the maps with `◀` / `▶` arrow buttons. Up to 3 tiles are shown side by side — the 2 selected scenarios' maps, and a **Difference** map. Images are sized to fit the browser viewport without scrolling.
-
-> ⚠️ **Downscaled map data currently exists for UP51a (both pathways), UP50 (both pathways), UP48, and UP46 (Current Trends only for the latter two).** Selecting a scenario without downscaled data shows a **"Map data not available"** placeholder — distinct from the "maps not generated yet, run `04_generate_maps.R`" message, since some scenarios (e.g. an NDC pathway for a given UP) may never get downscaled data at all, and the script can't fix that.
-
-### Map types
-
-| Type | Description | Classes / pairs |
-|------|-------------|-----------------|
-| **Land Cover** | Total area per class per year | Forest · Cropland · Pasture · OtherLand · Urban |
-| **Outflows** | Total area lost from each class | Forest · Cropland · Pasture · OtherLand · Urban |
-| **Transitions** | Area converted between two specific classes | Forest→Cropland · Forest→Pasture · Cropland→Forest · Pasture→Cropland · OtherLand→Cropland |
-
-For **Land Cover**, each scenario tile's header also shows the FABLE Calculator's own aggregate total for that class/year, e.g. `"UP50 - Current Trends (FABLE-C: 558.29 Mha)"` — an easy way to check the downscaled map's spatial total against the Calculator's own number.
-
-### Difference maps
-
-Only computed between 2 scenarios of the **same UP calibration** — uses a diverging **RdBu** colour scale (±310 × 1 000 ha): blue cells indicate the second scenario has more area, red cells indicate less. When the two scenarios are identical for a given variable and year, the app shows a "No difference" placeholder. **Comparing scenarios across different UP calibrations (e.g. UP51 vs UP50) isn't supported yet** — the Difference tile shows a distinct "not available yet" message instead, planned for a future update.
-
-### Generating maps
-
-Maps are generated by `04_generate_maps.R` and saved to `data/maps/` (gitignored) as `data/maps/UP<n>_ct/`, `data/maps/UP<n>_ndc/`, `data/maps/diff/UP<n>/`. Scenarios are discovered from `scenarios.csv` — only those with a matching downscaled file (`data/luc/downscaled_LUC_UP<n>_<ct|ndc>.rds`) are processed; adding a new UP's downscaled data later needs no code changes, just rerun the script. The launchers regenerate maps automatically on first run. To regenerate manually:
-
-```bash
-Rscript 04_generate_maps.R                        # every scenario with downscaled data + all same-UP diffs
-Rscript 04_generate_maps.R "UP50 - Current Trends"  # one scenario by its scenarios.csv label + diffs
-Rscript 04_generate_maps.R diff                   # diffs only (fastest)
-```
-
-> Interactive (Leaflet-based) maps are planned for a future branch (`downscaling-dynamic`).
-
-## 🕰️ Shiny app — Historical Maps tab
-
-Observed land-use maps (not scenario output), placed right after the Maps tab. They are static PNGs copied unchanged from the MAgPIE scenario viewer into `data/historical_maps/` — this repo doesn't generate them.
-
-| Control | Options |
-|---------|---------|
-| **Source** | Two **mutually exclusive** switches: **IBGE (Cropland)** (on when the tab opens) and **MapBiomas C10**. Turning one on turns the other off; turning both off shows a "Select a source" placeholder. |
-| **MapBiomas Classes** | Shown only while MapBiomas C10 is on: one switch per class, 32 in total — MapBiomas' 30 own land-cover classes plus two aggregates, **Native Vegetation** and **Cropland**. Clicking MapBiomas shows **Forest Formation** only; every other class you switch on adds a map. Your class selection is remembered if you switch to IBGE and back. |
-| **Timeline** | `◀` / `▶` and year buttons, 1995–2020 in 5-year steps (default 2020) |
-
-The map grid resizes to the number of maps on screen: 1 map is shown centred, 2 side by side, 3 in a row, 4 as a 2×2 grid, and 5 or more wrap three per row. IBGE only has Cropland, so it's always a single map, and the timeline starts at 2020 for both sources. Some MapBiomas classes aren't mapped in every year (e.g. Cotton starts in 2000, Photovoltaic Power Plant only exists in 2020) — those years show a "No map for this year" placeholder in that class's slot. The scenario switches don't affect this tab.
-
-## 🍽️ Shiny app — Food tab
-
-| Control | Options |
-|---------|---------|
-| **Variable** | Food Consumption |
-| **Scenario** | One switch per scenario in `scenarios.csv`; any number on at once |
-| **Years** | "Calibration Only" switch — off = 2000–2050, on = 2000–2020 |
-| **Chart type** | Icon dropdown — Line chart · Bar chart · Area chart |
-
-Values are in **kcal/cap/day**. Source: `kcal_feas` column from the aggregate SCENATHON_report table. No historical data — the chart shows scenario lines only and the right panel shows a values table rounded to whole numbers.
-
-## 🔁 Shiny app — Transition Matrix tab
-
-A heatmap view of the same land-use conversion data the Land Use Change tab's Chord/Sankey diagrams use — rows are the "From" class, columns are "To", one heatmap per selected scenario, side by side.
-
-| Control | Options |
-|---------|---------|
-| **Scenario** | One switch per scenario in `scenarios.csv`; shared with every other tab |
-| **Period** | Slider, 2000–2050, default 2020–2050 — same control as the Land Use Change tab, summing every 5-year period inside the chosen window |
-
-Values are always **area moved (Mha)**, modelled on Figure 3 of the reference artifact. The diagonal (land that stayed in the same class) is deliberately left empty — a white cell crossed by a "/" — so the matrix shows only what actually changed. Transitions the model doesn't allow currently show as 0 (an explicit marker for them is planned). Each cell shows both an always-visible value and a hover tooltip (`From → To: value`). Colour scale runs white (0) to the app's dark turquoise (the same colour as an active switch); cell text automatically switches between black and white so it stays readable against both ends of the scale. **All heatmaps on screen share one scale**, topped at the largest flow among the currently selected scenarios (e.g. one scenario peaking at 30 Mha next to one peaking at 60 Mha are both drawn 0–60), so cell shades are directly comparable across scenarios; it updates as you switch scenarios on/off or move the Period slider. Row/column headers ("FROM"/"TO") and class names are always horizontal.
-
-## 📄 Generating the Word report
-
-> **Experimental** — this feature is still under development and may produce incomplete or inconsistent output.
-
-`03_generate_report.R` generates a static Word document (`FABLE_Report_BRA_v50.docx`) with one landscape page per variable, each containing a line chart (Current Trends vs NDC Commitments + Historical where available) and a values table for 2000–2050.
-
-Additional packages required (beyond the Shiny app):
-
-```r
-install.packages(c("ggplot2", "officer", "flextable"))
-```
-
-Run from the project root:
-
-```r
-source("03_generate_report.R")
-```
-
-Or from the terminal:
-
-```bash
-Rscript 03_generate_report.R
-```
-
-The output file is saved in the project root. To update the table of contents in Word, press **Ctrl+A → F9**.
+**Word report (experimental).** `03_generate_report.R` produces a static Word document comparing the UP50 Current Trends and NDC pathways. It is still under development.
 
 ---
 
@@ -566,4 +187,3 @@ The output file is saved in the project root. To update the table of contents in
 Wanderson Costa (wcosta.comp@gmail.com)
 
 🤖 This application was developed with the assistance of [Claude Code](https://claude.ai/code).
-
