@@ -515,9 +515,8 @@ A heatmap view of the same land-use conversion data the Land Use Change tab's Ch
 |---------|---------|
 | **Scenario** | One switch per scenario in `scenarios.csv`; shared with every other tab |
 | **Period** | Slider, 2000–2050, default 2020–2050 — same control as the Land Use Change tab, summing every 5-year period inside the chosen window |
-| **Show as** | Percentage (row-normalized — each row sums to 100% of that class's starting area, diagonal included) · Area (Mha) |
 
-Each cell shows both an always-visible value and a hover tooltip (`From → To: value`). The diagonal is that class's "stayed as X" share — e.g. a Forest row reading 92% means 92% of that class's starting area was still Forest at the end of the selected window, with the rest spread across whichever classes it converted to. Colour scale runs light green (low) to dark blue (high); cell text automatically switches between black and white so it stays readable against both ends of the scale. Row/column headers ("FROM"/"TO") and class names are always horizontal.
+Values are always **area moved (Mha)**, modelled on Figure 3 of the reference artifact. The diagonal (land that stayed in the same class) is deliberately left empty — a white cell crossed by a "/" — so the matrix shows only what actually changed. Transitions the model doesn't allow currently show as 0 (an explicit marker for them is planned). Each cell shows both an always-visible value and a hover tooltip (`From → To: value`). Colour scale runs white (0) to the app's dark turquoise (the same colour as an active switch); cell text automatically switches between black and white so it stays readable against both ends of the scale. **All heatmaps on screen share one scale**, topped at the largest flow among the currently selected scenarios (e.g. one scenario peaking at 30 Mha next to one peaking at 60 Mha are both drawn 0–60), so cell shades are directly comparable across scenarios; it updates as you switch scenarios on/off or move the Period slider. Row/column headers ("FROM"/"TO") and class names are always horizontal.
 
 ## 📄 Generating the Word report
 

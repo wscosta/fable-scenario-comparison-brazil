@@ -1411,27 +1411,24 @@ make_luc_chord <- function(scen, classes = LUC_CHORD_CLASSES, start_year = 2020,
 # ── Transition Matrix tab (heatmap) ────────────────────────────────────────
 # A 4th view of the exact same calc_landmatrix-derived data the Chord/Sankey
 # diagrams use (get_luc_flows()/luc_flow_matrix()) — just pivoted into a dense
-# matrix and rendered as a heatmap instead of a flow diagram. "Percentage"
-# mode divides each row by its own total: since luc_flow_matrix()'s diagonal
-# is already the persistence value (AreaStart - total outflow, see
-# get_luc_flows), every row's off-diagonal + diagonal cells sum to exactly
-# that class's AreaStart at start_year, so row-normalizing gives a clean
-# "100% of class X's start_year area went ..." reading, diagonal included.
+# matrix and rendered as a heatmap instead of a flow diagram. Area (Mha) only,
+# modelled on Figure 3 of the reference artifact the user shared: the diagonal
+# ("stayed as X", luc_flow_matrix()'s persistence value) is deliberately left
+# empty so the matrix shows only land that actually moved between classes.
+# Impossible transitions are not marked yet (just 0), per the user.
 transmatrix_value_matrix <- function(scen, classes = LUC_CLASSES, start_year = 2020,
-                                      end_year = 2050, mode = "pct") {
-  m <- luc_flow_matrix(scen, classes, start_year, end_year)  # Mha; diag = persistence
-  if (mode != "pct") return(m)
-  row_sums <- rowSums(m)
-  pct <- m / row_sums * 100
-  # A class with 0 area at start_year (e.g. NewForest in most Current Trends
-  # scenarios) divides 0/0 -> NaN for every cell in its row; shown as a real
-  # 0% (a normal coloured cell), not NA/blank, per explicit user request.
-  pct[!is.finite(pct)] <- 0
-  pct
+                                      end_year = 2050) {
+  m <- luc_flow_matrix(scen, classes, start_year, end_year)  # Mha
+  diag(m) <- NA_real_
+  m
 }
 
+# zmax: upper end of the colour scale. make_transmat_server passes the largest
+# off-diagonal flow across ALL currently selected scenarios so every heatmap
+# shares one scale (a 0-30 and a 0-60 scenario both render 0-60); NULL falls
+# back to this scenario's own maximum.
 make_transmatrix_heatmap <- function(scen, classes = LUC_CLASSES, start_year = 2020,
-                                      end_year = 2050, mode = "pct") {
+                                      end_year = 2050, zmax = NULL) {
   title_txt  <- paste0("<b>", luc_title_text(scen, start_year, end_year), "</b>")
   title_font <- list(color = "black", size = 15)
   empty_plot <- function(msg) plot_ly() %>%
@@ -1442,7 +1439,7 @@ make_transmatrix_heatmap <- function(scen, classes = LUC_CLASSES, start_year = 2
 
   if (end_year <= start_year) return(empty_plot("End year must be after start year"))
 
-  m <- transmatrix_value_matrix(scen, classes, start_year, end_year, mode)
+  m <- transmatrix_value_matrix(scen, classes, start_year, end_year)
   if (all(is.na(m) | m == 0)) return(empty_plot("No land-use transitions in this window"))
 
   n      <- length(classes)
@@ -1450,23 +1447,25 @@ make_transmatrix_heatmap <- function(scen, classes = LUC_CLASSES, start_year = 2
   grid   <- expand.grid(i = seq_len(n), j = seq_len(n))
   val    <- m[cbind(grid$i, grid$j)]
 
-  cell_fmt   <- if (mode == "pct") "%.0f%%" else "%.2f"
-  hover_fmt  <- if (mode == "pct") "%.1f%%" else "%.2f Mha"
-  cell_text  <- ifelse(is.na(val), "", sprintf(cell_fmt, val))
-  hover_text <- sprintf("%s &#8594; %s<br><b>%s</b>", labels[grid$i], labels[grid$j],
-                        ifelse(is.na(val), "n/a", sprintf(hover_fmt, val)))
+  # NA cells (the diagonal) get no text and no hover — plotly draws NA z
+  # values as empty cells.
+  cell_text  <- ifelse(is.na(val), "", sprintf("%.2f", val))
+  hover_text <- ifelse(is.na(val), "",
+                       sprintf("%s &#8594; %s<br><b>%.2f Mha</b>",
+                               labels[grid$i], labels[grid$j], val))
 
-  # Fixed green (low) -> blue (high) scale — needs an actual light-to-dark
-  # span (not two equally-saturated colours) for the text-contrast switch
-  # below to ever produce both black and white. heat_low is a step lighter
-  # than NewForest's own palette colour (#A5D6A7) per explicit user request.
-  # zmin/zmax are pinned explicitly (0-100 for pct, 0-max for area) so the
-  # colour each cell actually renders in and the luminance computed below for
-  # its text colour are always reading off the exact same scale.
-  heat_low  <- "#C8E6C9"
-  heat_high <- "#002776"
+  # White (low) -> the app's dark turquoise (high), per explicit user request:
+  # #007B8A is the theme primary (bs_theme) — the colour of an active switch
+  # or the Period slider — replacing the earlier black end (and before that,
+  # green -> blue). The light-to-dark span is also what lets the text-contrast
+  # switch below produce both colours.
+  # zmin/zmax are pinned explicitly so the colour each cell actually renders
+  # in and the luminance computed below for its text colour are always
+  # reading off the exact same scale.
+  heat_low  <- "#FFFFFF"
+  heat_high <- "#007B8A"
   zmin <- 0
-  zmax <- if (mode == "pct") 100 else max(val, na.rm = TRUE)
+  if (is.null(zmax) || !is.finite(zmax) || zmax <= 0) zmax <- max(val, na.rm = TRUE)
 
   # Per-cell text colour: interpolate the same colour this value maps to on
   # the heatmap's own scale, then pick white/black by perceived luminance —
@@ -1488,15 +1487,42 @@ make_transmatrix_heatmap <- function(scen, classes = LUC_CLASSES, start_year = 2
          showarrow = FALSE, font = list(color = text_col[k], size = 10))
   })
 
+  # Cell borders + a "/" slash across each diagonal cell, drawn as shapes in
+  # the categorical axes' index coordinates (category k sits at k - 1, cells
+  # span +/-0.5). Light-grey borders keep zero (white) cells distinguishable
+  # from the page background; the slash marks the diagonal as "no data" (same
+  # convention as the reference artifact) instead of leaving it looking like
+  # a 0. The y axis is reversed, so a bottom-left -> top-right slash runs from
+  # (j - 0.3, i + 0.3) to (j + 0.3, i - 0.3).
+  border <- "#d0d0d0"
+  edges  <- seq(-0.5, n - 0.5)
+  cell_shapes <- c(
+    lapply(edges, function(e) list(type = "line", xref = "x", yref = "y", layer = "above",
+                                   x0 = e, x1 = e, y0 = -0.5, y1 = n - 0.5,
+                                   line = list(color = border, width = 1))),
+    lapply(edges, function(e) list(type = "line", xref = "x", yref = "y", layer = "above",
+                                   x0 = -0.5, x1 = n - 0.5, y0 = e, y1 = e,
+                                   line = list(color = border, width = 1))),
+    # White rects over the diagonal cells (drawn after the border lines, so
+    # the grid doesn't show through them), then the slash on top.
+    lapply(seq_len(n) - 1, function(k) list(type = "rect", xref = "x", yref = "y", layer = "above",
+                                            x0 = k - 0.5, x1 = k + 0.5, y0 = k - 0.5, y1 = k + 0.5,
+                                            fillcolor = "white", line = list(width = 0))),
+    lapply(seq_len(n) - 1, function(k) list(type = "line", xref = "x", yref = "y", layer = "above",
+                                            x0 = k - 0.3, x1 = k + 0.3, y0 = k + 0.3, y1 = k - 0.3,
+                                            line = list(color = "#9e9e9e", width = 1.5)))
+  )
+
   plot_ly(
     x = labels, y = labels, z = m,
     type = "heatmap", colors = c(heat_low, heat_high), zmin = zmin, zmax = zmax,
     showscale = TRUE,
     text = matrix(hover_text, n, n), hoverinfo = "text",
-    colorbar = list(title = if (mode == "pct") "%" else "Mha", len = 0.8)
+    colorbar = list(title = "Mha", len = 0.8)
   ) %>%
     layout(
       annotations = cell_annotations,
+      shapes = cell_shapes,
       # Plotly's default title y-position doesn't account for xaxis.side =
       # "top" pushing the "TO" axis title + tick row up into the same band —
       # pinning the title to the very top (y near 1, yanchor "top") and
@@ -1521,10 +1547,7 @@ transmat_sidebar_ui <- function() {
         span("2000", style = "position:absolute; left:0;"),
         span("2020", style = "position:absolute; left:40%; transform:translateX(-50%);"),
         span("2050", style = "position:absolute; right:0;")
-    ),
-    radioButtons("transmat_mode", "Show as",
-                 choices = c("Percentage" = "pct", "Area (Mha)" = "area"),
-                 selected = "pct")
+    )
   )
 }
 
@@ -1534,6 +1557,22 @@ transmat_sidebar_ui <- function() {
 # `scen <- s`, see [[feature-land-use-change-tab]] for why that's load-bearing).
 make_transmat_server <- function(input, output, session) {
   transmat_scen_sel <- reactive(get_selected_scenarios_r(input, "transmat"))
+
+  # One shared colour-scale maximum: the largest off-diagonal flow across every
+  # currently selected scenario for the chosen period. Depends on the switches
+  # and the period slider, so adding/removing a scenario or moving the slider
+  # re-scales every heatmap together (each tile's renderPlotly reads this).
+  transmat_zmax <- reactive({
+    scens <- transmat_scen_sel()
+    yrs   <- input$transmat_years
+    req(length(scens) > 0, yrs)
+    if (yrs[2] <= yrs[1]) return(NULL)
+    mx <- vapply(scens, function(s)
+      suppressWarnings(max(transmatrix_value_matrix(s, LUC_CLASSES, yrs[1], yrs[2]), na.rm = TRUE)),
+      numeric(1))
+    mx <- mx[is.finite(mx)]
+    if (length(mx) == 0) NULL else max(mx)
+  })
 
   output$transmat_grid <- renderUI({
     req(length(transmat_scen_sel()) > 0)
@@ -1564,7 +1603,7 @@ make_transmat_server <- function(input, output, session) {
         req(on_r(), input$transmat_years)
         make_transmatrix_heatmap(scen, start_year = input$transmat_years[1],
                                   end_year = input$transmat_years[2],
-                                  mode = input$transmat_mode %||% "pct")
+                                  zmax = transmat_zmax())
       })
     })
   }
