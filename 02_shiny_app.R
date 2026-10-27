@@ -47,8 +47,12 @@ df_luc_stock  <- readRDS("data/processed/df_luc_stock.rds")
 scenario_meta       <- read.csv("data/xlsx/scenarios.csv", stringsAsFactors = FALSE)
 available_scenarios <- scenario_meta$label
 
+# 12 colours so up to 12 scenarios each get their own (the 9th..12th were added
+# once the file passed 8 rows — beyond that the palette wraps and two scenarios
+# would share a colour).
 SCENARIO_PALETTE <- c("#1565C0", "#009C3B", "#E65100", "#6A1B9A",
-                      "#00838F", "#C62828", "#4527A0", "#AD1457")
+                      "#00838F", "#C62828", "#4527A0", "#AD1457",
+                      "#6D4C41", "#F9A825", "#37474F", "#827717")
 scenario_colors <- setNames(
   SCENARIO_PALETTE[((seq_along(available_scenarios) - 1) %% length(SCENARIO_PALETTE)) + 1],
   available_scenarios
@@ -497,6 +501,33 @@ crops_map <- list(
     prod_unit     = "1000 t",    # ProdQ_feas in 1000 t → to_mt() divides by 1000
     hist_area_type = "Sugarcane Area",       hist_area_src = "IBGE",
     hist_prod_type = "Sugarcane Production", hist_prod_src = "IBGE"
+  ),
+  # Rice / Dry Beans / Cassava added after the original three (per user
+  # request), in this order, following Sugarcane (3rd) — so 4th, 5th, 6th. The
+  # Calculator's own product keys are rice / beans / cassava. "Dry Beans" is
+  # the UI label for `beans` (the GLOBIOM crop list's dry-bean crop, as opposed
+  # to its separate peas / pulses_other keys); its historical rows are named
+  # "Beans Area"/"Beans Production" in histdatabrazil.csv.
+  "Rice" = list(
+    fable_product = "rice",
+    area_unit     = "1000 ha",
+    prod_unit     = "1000 t",
+    hist_area_type = "Rice Area",       hist_area_src = "IBGE",
+    hist_prod_type = "Rice Production", hist_prod_src = "IBGE"
+  ),
+  "Dry Beans" = list(
+    fable_product = "beans",
+    area_unit     = "1000 ha",
+    prod_unit     = "1000 t",
+    hist_area_type = "Beans Area",       hist_area_src = "IBGE",
+    hist_prod_type = "Beans Production", hist_prod_src = "IBGE"
+  ),
+  "Cassava" = list(
+    fable_product = "cassava",
+    area_unit     = "1000 ha",
+    prod_unit     = "1000 t",
+    hist_area_type = "Cassava Area",       hist_area_src = "IBGE",
+    hist_prod_type = "Cassava Production", hist_prod_src = "IBGE"
   )
 )
 crops_map <- Filter(function(cfg) cfg$fable_product %in% df_crops$Product, crops_map)
@@ -2160,7 +2191,7 @@ ui <- page_navbar(
     layout_sidebar(
       sidebar = sidebar(
         selectInput("crop_name", "Crop",
-                    choices  = c("Soybeans", "Corn", "Sugarcane"),
+                    choices  = names(crops_map),
                     selected = "Soybeans"),
         selectInput("crop_type", "Type",
                     choices  = c("Area", "Production", "Yield"),

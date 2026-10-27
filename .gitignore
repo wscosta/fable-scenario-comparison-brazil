@@ -24,6 +24,9 @@ generate_diff_maps.bat
 # Raw staging file for new histdatabrazil.csv rows — merged in, not itself tracked
 data/csv/additional.csv
 
+# Excel's temporary lock files, created while a workbook is open
+~$*
+
 # OS
 .DS_Store
 Thumbs.db

@@ -15,17 +15,18 @@ There are two kinds of pathway:
 - **Current Trends** — business as usual: what happens if today's trends continue.
 - **NDC Commitments** — what happens if Brazil delivers on its climate commitments under the Paris Agreement (its *Nationally Determined Contribution*).
 
-Each pathway comes in several **calibrations** (UP46, UP48, UP50, UP51, UP51a). A calibration is a version of the model's setup, refined over time — a higher number means a more recent one. **UP51a is the newest**: it is UP51 with an updated land-use baseline (MapBiomas Collection 10 and IBGE).
+Each pathway comes in several **calibrations** (UP46, UP48, UP50, UP51, UP51a, UP51b). A calibration is a version of the model's setup, refined over time — a higher number (and, within the same number, a later letter) means a more recent one. **UP51b is the newest.** UP51a was UP51 with an updated land-use baseline (MapBiomas Collection 10 and IBGE).
 
 | Calibration | Current Trends | NDC Commitments |
 |-------------|:--------------:|:---------------:|
+| UP51b | ✅ | ✅ |
 | UP51a | ✅ | ✅ |
 | UP51 | ✅ | ✅ |
 | UP50 | ✅ | ✅ |
 | UP48 | ✅ | ✅ |
 | UP46 | ✅ | — |
 
-When the app opens, only the newest calibration (UP51a) is switched on; every other scenario is one click away.
+When the app opens, only the newest calibration (UP51b) is switched on; every other scenario is one click away.
 
 ### Quick glossary
 
@@ -113,7 +114,7 @@ CO₂ AFOLU starts in 2005, and it can go **below zero** when forests and land a
 
 ### 🌾 Crops
 
-**Soybeans, Corn and Sugarcane** — choose whether to see **Area** (Mha), **Production** (Mt) or **Yield** (tonnes per hectare). Observed data come from IBGE.
+**Soybeans, Corn, Sugarcane, Rice, Dry Beans and Cassava** — choose whether to see **Area** (Mha), **Production** (Mt) or **Yield** (tonnes per hectare). Observed data come from IBGE.
 
 ### 🐄 Livestock
 
@@ -139,7 +140,7 @@ One grid is shown per selected scenario, and **all grids use the same colour sca
 
 ### 🌎 Maps
 
-Maps of **where** land-use change happens across Brazil, for the scenarios that have been spatially downscaled (currently UP51a, UP50, UP48 and UP46 — UP48 and UP46 for Current Trends only).
+Maps of **where** land-use change happens across Brazil, for the scenarios that have been spatially downscaled (currently UP51a, UP50, UP48 and UP46 — UP48 and UP46 for Current Trends only). Maps for UP51b will appear here as soon as its downscaled data is added.
 
 - **Map Type** — *Land Cover* (area of a class in each year), *Outflows* (area lost by a class) or *Transitions* (area converted from one class to another).
 - **Scenario** — choose up to two. When both belong to the same calibration, a third map shows the **difference** between them (blue = the second scenario has more, red = less).
