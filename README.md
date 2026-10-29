@@ -140,7 +140,7 @@ One grid is shown per selected scenario, and **all grids use the same colour sca
 
 ### 🌎 Maps
 
-Maps of **where** land-use change happens across Brazil, for the scenarios that have been spatially downscaled (currently UP51a, UP50, UP48 and UP46 — UP48 and UP46 for Current Trends only). Maps for UP51b will appear here as soon as its downscaled data is added.
+Maps of **where** land-use change happens across Brazil, for the scenarios that have been spatially downscaled (currently UP51b, UP51a, UP50, UP48 and UP46 — UP48 and UP46 for Current Trends only). The newest calibration with both pathways (UP51b) is shown when the tab opens.
 
 - **Map Type** — *Land Cover* (area of a class in each year), *Outflows* (area lost by a class) or *Transitions* (area converted from one class to another).
 - **Scenario** — choose up to two. When both belong to the same calibration, a third map shows the **difference** between them (blue = the second scenario has more, red = less).
