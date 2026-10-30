@@ -74,7 +74,7 @@ Double-click the file for your computer — no terminal needed. The app opens in
 | **macOS** | `open_app_mac.command` (first time: right-click → Open) |
 | **Ubuntu** | `open_app_ubuntu.sh` |
 
-The very first launch prepares the data and maps, which can take a few minutes. After that it opens quickly.
+The first launch prepares the data and maps, which can take several minutes. After that it opens quickly. Whenever a new scenario (or new map data) is added, the next launch creates just the maps that are missing, so you never have to do it by hand.
 
 ## 🧭 A tour of the app
 
@@ -175,7 +175,7 @@ Maps of what has actually been **observed** in Brazil — not scenario results �
 **Adding a scenario.** Put the new `.xlsx` in `data/xlsx/` and add one row to `data/xlsx/scenarios.csv` (`file`, `label`, and an optional `up` number — only the highest `up` starts switched on; a revision of an existing calibration can use a decimal such as `51.1`). No code changes are needed, and the row order sets the display order and colours.
 
 **Map data.**
-- The *Maps* tab reads PNGs that `04_generate_maps.R` builds from the downscaled files in `data/luc/` (`downscaled_LUC_UP<n>_<ct|ndc>.rds`). The launchers run it automatically the first time; to rerun by hand: `Rscript 04_generate_maps.R`. Scenarios without a downscaled file simply show "Map data not available".
+- The *Maps* tab reads PNGs that `04_generate_maps.R` builds from the downscaled files in `data/luc/` (`downscaled_LUC_UP<n>_<ct|ndc>.rds`). The launchers run it on every start in "missing only" mode (`Rscript 04_generate_maps.R missing`: skips every scenario and difference whose maps are already complete, so it is instant when nothing is new); to rebuild everything by hand: `Rscript 04_generate_maps.R`. The map images are not stored in git, so after pulling new downscaled files, launching the app once is enough to generate them. Scenarios without a downscaled file simply show "Map data not available".
 - The *Historical Maps* tab reads the ready-made PNGs in `data/historical_maps/` (copied from the MAgPIE scenario viewer; they are not generated here).
 
 **Historical observations** live in `data/csv/histdatabrazil.csv` (`type`, `source`, `year`, `value`, `unit`).

@@ -7,6 +7,9 @@
 #   Rscript 04_generate_maps.R                      # every scenario with downscaled data + all diffs
 #   Rscript 04_generate_maps.R "UP50 - Current Trends"   # one scenario (label from scenarios.csv) + all diffs
 #   Rscript 04_generate_maps.R diff                 # diffs only, skip scenario maps
+#   Rscript 04_generate_maps.R missing              # only scenarios/diffs whose maps aren't complete yet
+#                                                   # (what the launchers run every time — a no-op once
+#                                                   # everything exists, picks up a newly added UP otherwise)
 #
 # Scenarios are discovered from data/xlsx/scenarios.csv — a scenario is
 # processed only if its downscaled LUC file exists on disk:
@@ -104,6 +107,25 @@ if (nrow(missing_meta) > 0)
 # 01_process_data.R) — both should describe the same ~850 Mha of Brazil, so
 # their ratio is exactly the correction needed, whatever convention that
 # scenario's downscaling run happened to use.
+#
+# That reference file is data/processed/df_scenarios.rds. The launchers run
+# this script *before* the app has had a chance to (re)build it, so on a fresh
+# clone it doesn't exist yet, and right after a new scenario is added to
+# scenarios.csv it exists but doesn't contain that scenario — in both cases
+# compute_scale_factor() would silently fall back to 0.001 and draw wrong maps.
+# So rebuild it here first (same trigger as 02_shiny_app.R's needs_reprocess()).
+processed_scenarios_stale <- function() {
+  f <- "data/processed/df_scenarios.rds"
+  if (!file.exists(f)) return(TRUE)
+  if (!setequal(unique(readRDS(f)$scenario), scenario_meta$label)) return(TRUE)
+  src <- c("data/xlsx/scenarios.csv", file.path("data/xlsx", scenario_meta$file))
+  max(file.info(src[file.exists(src)])$mtime) > file.info(f)$mtime
+}
+if (processed_scenarios_stale()) {
+  cat("data/processed/df_scenarios.rds is missing or out of date — running 01_process_data.R first.\n")
+  # own environment: it defines its own `scenario_meta` etc. that must not clobber ours
+  suppressPackageStartupMessages(source("01_process_data.R", local = new.env()))
+}
 df_scenarios_calc <- if (file.exists("data/processed/df_scenarios.rds")) {
   readRDS("data/processed/df_scenarios.rds")
 } else {
@@ -132,10 +154,13 @@ compute_scale_factor <- function(luc, label) {
 
 args <- commandArgs(trailingOnly = TRUE)
 diff_only <- FALSE
+missing_only <- FALSE
 if (length(args) > 0) {
   arg <- trimws(args[1])
   if (tolower(arg) == "diff") {
     diff_only <- TRUE
+  } else if (tolower(arg) == "missing") {
+    missing_only <- TRUE
   } else {
     match_label <- available_meta$label[tolower(available_meta$label) == tolower(arg)]
     if (length(match_label) == 1) {
@@ -480,6 +505,10 @@ run_diff <- function() {
     ct_row  <- rows[rows$pathway == "ct", ]
     ndc_row <- rows[rows$pathway == "ndc", ]
     if (nrow(ct_row) == 1 && nrow(ndc_row) == 1) {
+      if (missing_only && maps_complete(sprintf("data/maps/diff/%s", tok))) {
+        cat("Up to date, skipping difference maps for", tok, "\n")
+        next
+      }
       run_diff_for_up(tok, ct_row$rds[1], ct_row$label[1], ndc_row$rds[1], ndc_row$label[1])
     } else {
       cat("\nSkipping diff for", tok, "— needs both Current Trends and NDC downscaled data.\n")
@@ -491,7 +520,23 @@ run_diff <- function() {
 # 5.  Run
 # =============================================================================
 
-if (!diff_only) for (sc in scenarios) run_scenario(sc)
+# A scenario/diff counts as complete once the very last file its run writes
+# exists (the last key transition in the last year — the only one that can't
+# be there after an interrupted run). A diff may instead leave a ".nodiff"
+# marker in that slot when the two scenarios are numerically identical.
+last_tr   <- key_transitions[[length(key_transitions)]]
+last_file <- sprintf("transition_%s_to_%s_2050", last_tr$from, last_tr$to)
+maps_complete <- function(dir) {
+  any(file.exists(file.path(dir, "transitions", paste0(last_file, c(".png", ".nodiff")))))
+}
+
+if (!diff_only) for (sc in scenarios) {
+  if (missing_only && maps_complete(sc$dir_out)) {
+    cat("Up to date, skipping:", sc$label, "\n")
+    next
+  }
+  run_scenario(sc)
+}
 run_diff()
 
 cat("\nAll done.\n")
