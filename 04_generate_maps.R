@@ -132,7 +132,12 @@ df_scenarios_calc <- if (file.exists("data/processed/df_scenarios.rds")) {
   message("data/processed/df_scenarios.rds not found — falling back to the legacy hardcoded 0.001 scale factor for every scenario. Run 01_process_data.R first if maps come out at the wrong scale.")
   NULL
 }
-CALC_AREA_COLS <- c("CalcForest", "CalcCropland", "CalcPasture", "CalcOtherLand", "CalcUrban")
+# Other Land = CalcOtherLand + NewOtherLand, as on the Land Use tab (landuse_map):
+# the downscaled "otherland" class includes the recently-converted stock too.
+# Omitting it understated the reference total whenever the rds starts at a year
+# where NewOtherLand is already > 0 (UP51b from 2020: 0.29%, so its maps came
+# out 0.29% low). Rds that start at 2000 (NewOtherLand = 0) are unaffected.
+CALC_AREA_COLS <- c("CalcForest", "CalcCropland", "CalcPasture", "CalcOtherLand", "NewOtherLand", "CalcUrban")
 
 compute_scale_factor <- function(luc, label) {
   fallback <- 0.001
