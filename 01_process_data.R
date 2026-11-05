@@ -15,20 +15,76 @@ missing_xlsx <- scenario_meta$path[!file.exists(scenario_meta$path)]
 if (length(missing_xlsx) > 0)
   stop("Missing xlsx file(s) listed in scenarios.csv: ", paste(missing_xlsx, collapse = ", "))
 
+# ── Locating tables by their header text, not by cell address ─────────────────
+# The Calculator's sheets get rows/columns inserted from one version to the
+# next (the LAND sheet's table moved down two rows in UP52, which broke a
+# hardcoded "K13:AK24"). Every table read below is therefore *found* by the
+# text of its header row — a run of consecutive header cells (the "signature")
+# searched for in the top-left of the sheet — and its extent is measured from
+# there, instead of assuming "row 29" / "BK31:BX91".
+probe_cache <- new.env()
+probe_sheet <- function(path, sheet, range = "A1:EZ200") {
+  key <- paste(path, sheet, range, sep = "|")
+  if (is.null(probe_cache[[key]])) {
+    m <- as.matrix(suppressMessages(
+      read_excel(path, sheet = sheet, range = range, col_names = FALSE, col_types = "text")))
+    m[] <- trimws(m)
+    dimnames(m) <- NULL
+    probe_cache[[key]] <- m
+  }
+  probe_cache[[key]]
+}
+
+# Topmost / leftmost place where `signature` appears as consecutive cells in one
+# row. Returns the header's row, first column, and its extent: n_cols = how many
+# header cells follow without a gap, n_rows = how many non-blank rows sit below
+# it in the first column (0-based: header excluded).
+locate_header <- function(path, sheet, signature) {
+  m    <- probe_sheet(path, sheet)
+  n    <- length(signature)
+  hits <- which(m == signature[1], arr.ind = TRUE)   # NA cells never match
+  hits <- hits[order(hits[, 1], hits[, 2]), , drop = FALSE]
+  for (i in seq_len(nrow(hits))) {
+    r <- hits[i, 1]; cc <- hits[i, 2]
+    if (cc + n - 1 > ncol(m) || !identical(m[r, cc:(cc + n - 1)], signature)) next
+    row_cells <- m[r, cc:ncol(m)]
+    col_cells <- m[r:nrow(m), cc]
+    return(list(row    = r, col = cc,
+                n_cols = which(is.na(c(row_cells, NA)))[1] - 1,
+                n_rows = which(is.na(c(col_cells, NA)))[1] - 2))
+  }
+  stop("Could not find a table headed '", paste(signature, collapse = " | "),
+       "' on sheet '", sheet, "' of ", path,
+       " — has the Calculator's layout changed?")
+}
+
+# Range object for read_excel(): from the header cell, `rows`/`cols` = NA means "to the end".
+block_range <- function(h, rows = NA, cols = NA, header_offset = 0) {
+  cellranger::cell_limits(
+    ul = c(h$row + header_offset, h$col),
+    lr = c(if (is.na(rows)) NA else h$row + rows, if (is.na(cols)) NA else h$col + cols - 1))
+}
+
 # ── Read SCENATHON_report ─────────────────────────────────────────────────────
-# Row 10 = units; row 11 = column headers; data rows start at row 12.
-# Each row = one year (2000, 2005, ..., 2050), columns = output variables.
+# Header row (Location | Year | ...) has the column names, the row above it the
+# units; data rows follow. Each row = one year (2000, 2005, ..., 2050),
+# columns = output variables.
+scenathon_header <- function(path)
+  locate_header(path, "SCENATHON_report", c("Location", "Year"))
 
 read_units <- function(path) {
-  unit_row     <- read_excel(path, sheet = "SCENATHON_report", skip = 9, n_max = 1, col_names = FALSE)
-  header_names <- names(read_excel(path, sheet = "SCENATHON_report", skip = 10, n_max = 0))
+  h            <- scenathon_header(path)
+  unit_row     <- read_excel(path, sheet = "SCENATHON_report", col_names = FALSE,
+                             range = cellranger::cell_limits(c(h$row - 1, h$col), c(h$row - 1, NA)))
+  header_names <- names(read_excel(path, sheet = "SCENATHON_report", n_max = 0,
+                                   range = block_range(h)))
   unit_vals    <- trimws(as.character(unlist(unit_row[1, ])))
   length(unit_vals) <- length(header_names)  # pad with NA if row is shorter
   setNames(unit_vals, header_names)
 }
 
 read_scenathon <- function(path, scenario_label) {
-  raw <- read_excel(path, sheet = "SCENATHON_report", skip = 10)
+  raw <- read_excel(path, sheet = "SCENATHON_report", range = block_range(scenathon_header(path)))
   names(raw) <- trimws(names(raw))
 
   year_col <- names(raw)[grepl("^year$", names(raw), ignore.case = TRUE)][1]
@@ -47,10 +103,11 @@ df_scenarios <- bind_rows(Map(read_scenathon, scenario_meta$path, scenario_meta$
 message("── SCENATHON_report columns ──────────────────────────────────")
 print(names(df_scenarios))
 
-# ── Read crop table (second table in SCENATHON_report, header at row 29) ──────
-# Columns used: B=Product, C=Year, G=ProdQ_feas, H=FeasHarvarea
+# ── Read crop table (second table in SCENATHON_report, headed Location|Product|Year) ──
+# Columns used: Product, Year, ProdQ_feas, FeasHarvarea, Export/Import_quantity
 read_crop_table <- function(path, scenario_label) {
-  raw        <- read_excel(path, sheet = "SCENATHON_report", skip = 28)
+  h          <- locate_header(path, "SCENATHON_report", c("Location", "Product", "Year"))
+  raw        <- read_excel(path, sheet = "SCENATHON_report", range = block_range(h))
   names(raw) <- trimws(names(raw))
   raw %>%
     filter(!is.na(Product), !is.na(Year)) %>%
@@ -69,15 +126,15 @@ df_crops <- bind_rows(Map(read_crop_table, scenario_meta$path, scenario_meta$lab
 message("── Crop products found ───────────────────────────────────────")
 print(sort(unique(df_crops$Product)))
 
-# ── Read cattle herd/density table (5_feas_livestock, header at row 29) ───────
+# ── Read cattle herd/density table (5_feas_livestock, headed ANIMAL_GLOBIOM|ANIMAL|YEAR|FeasHerd) ──
 # Filter ANIMAL == "cattle"; two rows per year (BOVO + BOVD) → sum FeasHerd,
 # first RumDensity (identical across sub-types within a year).
 read_livestock_table <- function(path, scenario_label) {
   # Sheet has multiple side-by-side tables causing duplicate column names.
-  # Read only the first 5 columns (A:E) and assign names explicitly.
-  raw <- read_excel(path, sheet = "5_feas_livestock", skip = 28,
-                    col_names = FALSE, col_types = "text")
-  raw <- raw[, 1:5]
+  # Read only this table's first 5 columns and assign names explicitly.
+  h   <- locate_header(path, "5_feas_livestock", c("ANIMAL_GLOBIOM", "ANIMAL", "YEAR", "FeasHerd"))
+  raw <- read_excel(path, sheet = "5_feas_livestock", col_names = FALSE, col_types = "text",
+                    range = cellranger::cell_limits(c(h$row + 1, h$col), c(NA, h$col + 4)))
   names(raw) <- c("ANIMAL_GLOBIOM", "ANIMAL", "YEAR", "FeasHerd", "RumDensity")
   raw %>%
     filter(!is.na(ANIMAL), !is.na(YEAR),
@@ -102,7 +159,9 @@ df_livestock <- bind_rows(Map(read_livestock_table, scenario_meta$path, scenario
 # (YearStart/YearEnd, 2000-2050). To{Class} columns are gross flow that period
 # (1000 ha/5 year); AreaStart/AreaEnd are stock (1000 ha) for that class/period.
 read_land_matrix <- function(path, scenario_label) {
-  raw <- read_excel(path, sheet = "4_calc_land", range = "BK31:BX91", col_names = TRUE)
+  h   <- locate_header(path, "4_calc_land", c("LandCoverInit", "YearStart", "YearEnd"))
+  raw <- read_excel(path, sheet = "4_calc_land", col_names = TRUE,
+                    range = block_range(h, rows = h$n_rows, cols = h$n_cols))
   raw %>%
     mutate(scenario   = scenario_label,
            YearStart  = as.integer(YearStart),
@@ -119,10 +178,19 @@ df_luc_matrix <- bind_rows(Map(read_land_matrix, scenario_meta$path, scenario_me
 # exactly diff() of the stock columns; deriving it ourselves avoids an
 # inconsistent class->column-name mapping and gives NewForest the same
 # treatment as the other 5 classes, which the sheet's own columns don't).
+#
+# The block's header row isn't at a fixed row across Calculator versions (it
+# sits on row 13 up to UP51b, row 15 in UP52 — two rows were added above it),
+# so it's located by header text (see locate_header()): the row whose first cell
+# is "Year" and whose second is "NATCropland" (the *names* row; the row above it
+# holds the human-readable labels and also starts with "Year").
 read_land_stock <- function(path, scenario_label) {
-  raw <- read_excel(path, sheet = "LAND", range = "K13:AK24", col_names = TRUE)
+  h   <- locate_header(path, "LAND", c("Year", "NATCropland"))
+  raw <- read_excel(path, sheet = "LAND", col_names = TRUE,
+                    range = block_range(h, rows = h$n_rows, cols = h$n_cols))
   raw %>%
-    mutate(scenario = scenario_label, Year = as.integer(Year)) %>%
+    mutate(scenario = scenario_label, Year = suppressWarnings(as.integer(Year))) %>%
+    filter(!is.na(Year), Year >= 2000, Year <= 2050) %>%
     select(scenario, year = Year, Cropland, Pasture, Forest, OtherLand, Urban, NewForest) %>%
     pivot_longer(c(Cropland, Pasture, Forest, OtherLand, Urban, NewForest),
                  names_to = "class", values_to = "area")

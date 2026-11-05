@@ -47,12 +47,13 @@ df_luc_stock  <- readRDS("data/processed/df_luc_stock.rds")
 scenario_meta       <- read.csv("data/xlsx/scenarios.csv", stringsAsFactors = FALSE)
 available_scenarios <- scenario_meta$label
 
-# 12 colours so up to 12 scenarios each get their own (the 9th..12th were added
-# once the file passed 8 rows — beyond that the palette wraps and two scenarios
-# would share a colour).
+# 16 colours so up to 16 scenarios each get their own (the 9th..12th were added
+# once the file passed 8 rows, the 13th..16th when UP52 took it to 13 — beyond
+# the palette's length it wraps and two scenarios would share a colour).
 SCENARIO_PALETTE <- c("#1565C0", "#009C3B", "#E65100", "#6A1B9A",
                       "#00838F", "#C62828", "#4527A0", "#AD1457",
-                      "#6D4C41", "#F9A825", "#37474F", "#827717")
+                      "#6D4C41", "#F9A825", "#37474F", "#827717",
+                      "#7CB342", "#039BE5", "#EC407A", "#78909C")
 scenario_colors <- setNames(
   SCENARIO_PALETTE[((seq_along(available_scenarios) - 1) %% length(SCENARIO_PALETTE)) + 1],
   available_scenarios
