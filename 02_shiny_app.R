@@ -2907,9 +2907,12 @@ server <- function(input, output, session) {
                                 "OtherLand → Cropland"),
                    selected = "Forest → Cropland")
     } else {
-      radioButtons("map_class", "Class",
-                   choices  = c("Forest", "Cropland", "Pasture", "OtherLand", "Urban"),
-                   selected = "Forest")
+      # New Forest (afforested land) only exists as a Land Cover map: nothing
+      # ever leaves it, so there is no "Outflow" map for it.
+      choices <- c("Forest", "Cropland", "Pasture", "OtherLand", "Urban")
+      if (input$map_type == "Land Cover")
+        choices <- c("Forest", "New Forest" = "NewForest", "Cropland", "Pasture", "OtherLand", "Urban")
+      radioButtons("map_class", "Class", choices = choices, selected = "Forest")
     }
   })
 
@@ -2967,6 +2970,14 @@ server <- function(input, output, session) {
   # "Other Land" (with space, matching the Land Use tab's selectInput) — same
   # class, different casing convention in each tab, so normalize here.
   fable_landuse_total_mha <- function(scenario_label, map_class, year) {
+    # New Forest isn't a Land Use tab class (no landuse_map entry, so it isn't
+    # in that tab's dropdown), but the Calculator has its own CalcNewForest.
+    if (map_class == "NewForest") {
+      row <- df_scenarios[df_scenarios$scenario == scenario_label &
+                          df_scenarios$Year == as.integer(year), ]
+      if (nrow(row) == 0) return(NA_real_)
+      return(as.numeric(row$CalcNewForest[1]) / 1000)   # 1000 ha -> Mha
+    }
     class_name  <- if (map_class == "OtherLand") "Other Land" else map_class
     if (is.null(landuse_map[[class_name]])) return(NA_real_)
     target_year <- as.integer(year)
@@ -3033,6 +3044,13 @@ server <- function(input, output, session) {
                class = "maps-img",
                style = "border:1px solid #ddd; border-radius:4px;",
                alt   = paste(sc_dir, type_sel, var_sel, year))
+    } else if (type_sel == "Land Cover" &&
+               file.exists(sprintf("data/maps/%s/landcover/landcover_%s.noclass", sc_dir, var_sel))) {
+      # 04_generate_maps.R leaves this marker when the downscaled data has no
+      # such class at all (e.g. New Forest in the UP50/48/46 runs) — an
+      # all-zero map there would wrongly read as "no afforestation".
+      map_placeholder("&#x1F6AB;", "Map data not available",
+                      "This downscaled data set has no New Forest class.")
     } else if (!data_available) {
       map_placeholder("&#x1F6AB;", "Map data not available",
                       "Downscaled data for this scenario doesn't exist yet.")

@@ -141,9 +141,10 @@ One grid is shown per selected scenario, and **all grids use the same colour sca
 
 ### 🌎 Maps
 
-Maps of **where** land-use change happens across Brazil, for the scenarios that have been spatially downscaled (currently UP51b, UP51a, UP50, UP48 and UP46 — UP48 and UP46 for Current Trends only). The newest calibration with both pathways (UP51b) is shown when the tab opens. Maps for UP52 will appear here as soon as its downscaled data is added.
+Maps of **where** land-use change happens across Brazil, for the scenarios that have been spatially downscaled (currently UP52, UP51b, UP51a, UP50, UP48 and UP46 — UP48 and UP46 for Current Trends only). The newest calibration with both pathways (UP52) is shown when the tab opens.
 
 - **Map Type** — *Land Cover* (area of a class in each year), *Outflows* (area lost by a class) or *Transitions* (area converted from one class to another).
+- **New Forest** — a Land Cover class of its own: land afforested under the NDC pathway (12 Mha by 2030, drawn in the same green and on the same scale as Forest, so each cell holds little and the map looks pale). It shows as empty on Current Trends, and it is "not available" for the older UP50, UP48 and UP46 data, whose downscaling did not track it. There is no Outflows map for it, since afforested land is not converted back.
 - **Scenario** — choose up to two. When both belong to the same calibration, a third map shows the **difference** between them (blue = the second scenario has more, red = less).
 - **Year** — 2020 to 2050, using the `◀` `▶` buttons or the year bar.
 

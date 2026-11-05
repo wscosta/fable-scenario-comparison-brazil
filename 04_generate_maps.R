@@ -137,7 +137,10 @@ df_scenarios_calc <- if (file.exists("data/processed/df_scenarios.rds")) {
 # Omitting it understated the reference total whenever the rds starts at a year
 # where NewOtherLand is already > 0 (UP51b from 2020: 0.29%, so its maps came
 # out 0.29% low). Rds that start at 2000 (NewOtherLand = 0) are unaffected.
-CALC_AREA_COLS <- c("CalcForest", "CalcCropland", "CalcPasture", "CalcOtherLand", "NewOtherLand", "CalcUrban")
+# CalcNewForest is in too: the rds' "newforest" class counts in the raw total
+# now that it is no longer dropped (it is 0 in 2020, where the reference year
+# lands, so today's factors don't move — this just keeps the two sides equal).
+CALC_AREA_COLS <- c("CalcForest", "CalcNewForest", "CalcCropland", "CalcPasture", "CalcOtherLand", "NewOtherLand", "CalcUrban")
 
 compute_scale_factor <- function(luc, label) {
   fallback <- 0.001
@@ -166,6 +169,9 @@ if (length(args) > 0) {
     diff_only <- TRUE
   } else if (tolower(arg) == "missing") {
     missing_only <- TRUE
+    # in this mode a scenario/diff that's incomplete is topped up file by file:
+    # every PNG (or ".nodiff" marker) that already exists is left alone, so
+    # adding a new map type only generates that type, not the whole set again.
   } else {
     match_label <- available_meta$label[tolower(available_meta$label) == tolower(arg)]
     if (length(match_label) == 1) {
@@ -179,10 +185,17 @@ if (length(args) > 0) {
 
 brazil_ext <- ext(-75, -33, -36, 6.75)
 
+# TRUE when, in "missing" mode, this output already exists (a diff may have left
+# a ".nodiff" marker instead of a PNG) — callers skip the work for it.
+already_done <- function(out_file) {
+  missing_only && (file.exists(out_file) || file.exists(sub("\\.png$", ".nodiff", out_file)))
+}
+
 scale_breaks <- c(0, 0.001, 5.9, 16.8, 37.3, 71.1, 130.4, 211.5, 260, 310)
 
 class_palettes <- list(
   Forest    = brewer.pal(9, "Greens"),
+  NewForest = brewer.pal(9, "Greens"),   # same green as Forest, own value scale below
   Cropland  = brewer.pal(9, "Reds"),
   Pasture   = brewer.pal(9, "Purples"),
   OtherLand = brewer.pal(9, "RdPu"),
@@ -191,17 +204,21 @@ class_palettes <- list(
 
 luc_classes <- names(class_palettes)
 
+# NewForest (afforested land) uses Forest's green palette AND the same 0-310
+# scale_breaks as every other class (explicit user request, so maps stay
+# comparable across classes). Note its cells only hold 0-15 thousand ha, so on
+# this scale the map is mostly the palest greens — that is the scale, not a bug.
+
 # Different downscaling runs have used different casing for lu.to/lu.from
 # (UP50's rds: "Forest", "Cropland", ... already Title Case; UP51a's rds:
-# "forest", "cropland", "newforest", ... all lowercase, plus a NewForest
-# class this script doesn't track). Normalizing to the canonical spelling
-# right after reading means every downstream filter/palette lookup (which is
-# hardcoded to luc_classes' Title Case) works regardless of source casing.
-# "newforest" is deliberately left unmapped (becomes NA, matches nothing in
-# luc_classes and is silently ignored) — this script tracks 5 classes only,
-# same as the Maps tab's own class list; NewForest is scoped to the Land Use
-# Change tab, not expanded here.
+# "forest", "cropland", "newforest", ... all lowercase). Normalizing to the
+# canonical spelling right after reading means every downstream filter/palette
+# lookup (which is hardcoded to luc_classes' Title Case) works regardless of
+# source casing. "newforest" maps to NewForest like the others; an rds that
+# has no such class at all (UP50, UP48, UP46) is detected by luc_has_class()
+# and gets a ".noclass" marker instead of a misleading all-zero map.
 LUC_CLASS_CANONICAL <- setNames(luc_classes, tolower(luc_classes))
+luc_has_class <- function(luc, cls) any(luc$lu.to == cls, na.rm = TRUE)
 normalize_luc_classes <- function(df) {
   df %>% mutate(lu.to = unname(LUC_CLASS_CANONICAL[tolower(lu.to)]),
                 lu.from = unname(LUC_CLASS_CANONICAL[tolower(lu.from)]))
@@ -284,7 +301,19 @@ run_scenario <- function(sc) {
 
   for (cls in luc_classes) {
     pal <- class_palettes[[cls]]
+    # A downscaling run that never had this class (the UP50/48/46 rds have no
+    # "newforest") would give an all-zero map that reads as "no afforestation";
+    # leave a marker instead so the app can say the data isn't there.
+    if (!luc_has_class(luc, cls)) {
+      writeLines(character(0), file.path(sc$dir_out, "landcover", sprintf("landcover_%s.noclass", cls)))
+      cat("  Skipping", cls, "- the downscaled data has no such class\n")
+      next
+    }
     for (yr in sort(unique(luc$year))) {
+      out_file  <- file.path(sc$dir_out, "landcover",
+                             sprintf("landcover_%s_%d.png", cls, yr))
+      if (already_done(out_file)) next
+
       df_yr <- luc |>
         filter(lu.to == cls, year == yr) |>
         group_by(id_c) |>
@@ -292,8 +321,6 @@ run_scenario <- function(sc) {
 
       total_mha <- sum(df_yr$value) / 1000
       r         <- to_raster(df_yr)
-      out_file  <- file.path(sc$dir_out, "landcover",
-                             sprintf("landcover_%s_%d.png", cls, yr))
 
       png(out_file, width = 820, height = 780, res = 100)
       plot(r,
@@ -315,8 +342,13 @@ run_scenario <- function(sc) {
   cat("\n--- Part 2a: Outflows ---\n")
 
   for (cls in luc_classes) {
+    if (cls == "NewForest") next   # afforested land never converts back: no outflow exists
     pal <- class_palettes[[cls]]
     for (yr in sort(unique(luc$year))) {
+      out_file  <- file.path(sc$dir_out, "transitions",
+                             sprintf("outflow_%s_%d.png", cls, yr))
+      if (already_done(out_file)) next
+
       df_yr <- luc |>
         filter(lu.from == cls, lu.to != cls, year == yr) |>
         group_by(id_c) |>
@@ -324,8 +356,6 @@ run_scenario <- function(sc) {
 
       total_mha <- sum(df_yr$value) / 1000
       r         <- to_raster(df_yr)
-      out_file  <- file.path(sc$dir_out, "transitions",
-                             sprintf("outflow_%s_%d.png", cls, yr))
 
       png(out_file, width = 820, height = 780, res = 100)
       plot(r,
@@ -348,6 +378,11 @@ run_scenario <- function(sc) {
 
   for (tr in key_transitions) {
     for (yr in sort(unique(luc$year))) {
+      label     <- sprintf("%s_to_%s", tr$from, tr$to)
+      out_file  <- file.path(sc$dir_out, "transitions",
+                             sprintf("transition_%s_%d.png", label, yr))
+      if (already_done(out_file)) next
+
       df_yr <- luc |>
         filter(lu.from == tr$from, lu.to == tr$to, year == yr) |>
         group_by(id_c) |>
@@ -355,9 +390,6 @@ run_scenario <- function(sc) {
 
       total_mha <- sum(df_yr$value) / 1000
       r         <- to_raster(df_yr)
-      label     <- sprintf("%s_to_%s", tr$from, tr$to)
-      out_file  <- file.path(sc$dir_out, "transitions",
-                             sprintf("transition_%s_%d.png", label, yr))
 
       png(out_file, width = 820, height = 780, res = 100)
       plot(r,
@@ -415,7 +447,7 @@ run_diff_for_up <- function(up_token, ct_rds, ct_label, ndc_rds, ndc_label) {
 
   years <- sort(unique(luc_ct$year))
 
-  plot_diff <- function(r_diff, title_text, out_file) {
+  plot_diff <- function(r_diff, title_text, out_file, ceil = diff_ceil) {
     mm <- as.numeric(minmax(r_diff, compute = TRUE))
     if (is.finite(mm[1]) && mm[1] == mm[2]) {
       writeLines(character(0), sub("\\.png$", ".nodiff", out_file))
@@ -426,7 +458,7 @@ run_diff_for_up <- function(up_token, ct_rds, ct_label, ndc_rds, ndc_label) {
     png(out_file, width = 820, height = 780, res = 100)
     plot(r_diff,
          col    = diff_pal,
-         range  = c(-diff_ceil, diff_ceil),
+         range  = c(-ceil, ceil),
          legend = "bottomright",
          mar    = c(1.5, 0.5, 4, 0.5),
          plg    = list(title = "1000 ha", cex = 0.8))
@@ -441,7 +473,16 @@ run_diff_for_up <- function(up_token, ct_rds, ct_label, ndc_rds, ndc_label) {
   cat("\n--- Part 1: Land Cover ---\n")
 
   for (cls in luc_classes) {
+    # needs the class in BOTH runs, same reasoning as in run_scenario()
+    if (!luc_has_class(luc_ct, cls) || !luc_has_class(luc_ndc, cls)) {
+      writeLines(character(0), file.path(dir_diff, "landcover", sprintf("landcover_%s.noclass", cls)))
+      cat("  Skipping", cls, "- not in both downscaled runs\n")
+      next
+    }
     for (yr in years) {
+      out_file <- file.path(dir_diff, "landcover", sprintf("landcover_%s_%d.png", cls, yr))
+      if (already_done(out_file)) next
+
       df_ct  <- luc_ct  |> filter(lu.to == cls, year == yr) |>
                 group_by(id_c) |> summarise(value = sum(value) * scale_ct, .groups = "drop")
       df_ndc <- luc_ndc |> filter(lu.to == cls, year == yr) |>
@@ -452,7 +493,7 @@ run_diff_for_up <- function(up_token, ct_rds, ct_label, ndc_rds, ndc_label) {
 
       plot_diff(r_diff,
                 sprintf("Difference (NDC - CT)\n%s | %d | %+.2f Mha", cls, yr, delta_mha),
-                file.path(dir_diff, "landcover", sprintf("landcover_%s_%d.png", cls, yr)))
+                out_file)
     }
   }
 
@@ -460,7 +501,11 @@ run_diff_for_up <- function(up_token, ct_rds, ct_label, ndc_rds, ndc_label) {
   cat("\n--- Part 2a: Outflows ---\n")
 
   for (cls in luc_classes) {
+    if (cls == "NewForest") next   # nothing ever leaves it, see run_scenario()
     for (yr in years) {
+      out_file <- file.path(dir_diff, "transitions", sprintf("outflow_%s_%d.png", cls, yr))
+      if (already_done(out_file)) next
+
       df_ct  <- luc_ct  |> filter(lu.from == cls, lu.to != cls, year == yr) |>
                 group_by(id_c) |> summarise(value = sum(value) * scale_ct, .groups = "drop")
       df_ndc <- luc_ndc |> filter(lu.from == cls, lu.to != cls, year == yr) |>
@@ -471,7 +516,7 @@ run_diff_for_up <- function(up_token, ct_rds, ct_label, ndc_rds, ndc_label) {
 
       plot_diff(r_diff,
                 sprintf("Difference (NDC - CT)\nLoss of %s | %d | %+.2f Mha", cls, yr, delta_mha),
-                file.path(dir_diff, "transitions", sprintf("outflow_%s_%d.png", cls, yr)))
+                out_file)
     }
   }
 
@@ -481,6 +526,9 @@ run_diff_for_up <- function(up_token, ct_rds, ct_label, ndc_rds, ndc_label) {
   for (tr in key_transitions) {
     label <- sprintf("%s_to_%s", tr$from, tr$to)
     for (yr in years) {
+      out_file <- file.path(dir_diff, "transitions", sprintf("transition_%s_%d.png", label, yr))
+      if (already_done(out_file)) next
+
       df_ct  <- luc_ct  |> filter(lu.from == tr$from, lu.to == tr$to, year == yr) |>
                 group_by(id_c) |> summarise(value = sum(value) * scale_ct, .groups = "drop")
       df_ndc <- luc_ndc |> filter(lu.from == tr$from, lu.to == tr$to, year == yr) |>
@@ -491,7 +539,7 @@ run_diff_for_up <- function(up_token, ct_rds, ct_label, ndc_rds, ndc_label) {
 
       plot_diff(r_diff,
                 sprintf("Difference (NDC - CT)\n%s -> %s | %d | %+.2f Mha", tr$from, tr$to, yr, delta_mha),
-                file.path(dir_diff, "transitions", sprintf("transition_%s_%d.png", label, yr)))
+                out_file)
     }
   }
 
@@ -531,8 +579,15 @@ run_diff <- function() {
 # marker in that slot when the two scenarios are numerically identical.
 last_tr   <- key_transitions[[length(key_transitions)]]
 last_file <- sprintf("transition_%s_to_%s_2050", last_tr$from, last_tr$to)
+# Also requires the NewForest land-cover slot to be settled (its last PNG, a
+# ".nodiff", or the ".noclass" marker for runs without that class) — a folder
+# generated before NewForest existed isn't "complete", and `missing` mode then
+# tops it up with just those files.
 maps_complete <- function(dir) {
-  any(file.exists(file.path(dir, "transitions", paste0(last_file, c(".png", ".nodiff")))))
+  any(file.exists(file.path(dir, "transitions", paste0(last_file, c(".png", ".nodiff"))))) &&
+    any(file.exists(file.path(dir, "landcover",
+                              c("landcover_NewForest_2050.png", "landcover_NewForest_2050.nodiff",
+                                "landcover_NewForest.noclass"))))
 }
 
 if (!diff_only) for (sc in scenarios) {
