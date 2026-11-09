@@ -191,7 +191,11 @@ already_done <- function(out_file) {
   missing_only && (file.exists(out_file) || file.exists(sub("\\.png$", ".nodiff", out_file)))
 }
 
-scale_breaks <- c(0, 0.001, 5.9, 16.8, 37.3, 71.1, 130.4, 211.5, 260, 310)
+# Same breaks as LAND_BREAKS in the MAgPIE scenario viewer (whole numbers, 0.001
+# kept as the "greater than zero" cut) — explicit user request, so the legends of
+# both apps' area maps read identically. Was c(0, 0.001, 5.9, 16.8, 37.3, 71.1,
+# 130.4, 211.5, 260, 310).
+scale_breaks <- c(0, 0.001, 6, 17, 37, 71, 130, 212, 260, 310)
 
 class_palettes <- list(
   Forest    = brewer.pal(9, "Greens"),
