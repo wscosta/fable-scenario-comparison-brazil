@@ -273,6 +273,31 @@ to_raster <- function(df) {
   terra::extend(r, brazil_ext)
 }
 
+# Draws an area map with the shared 0-310 class legend. A raster holding a single
+# value (all zero: NewForest in Current Trends, a class with no outflow, ...) is
+# NOT handed to plot(breaks = ) — some terra versions then ignore the breaks and
+# paint the whole country in the darkest colour with a single legend square.
+# Instead the value is mapped to its class by hand and drawn as a categorical
+# raster with every class in the legend (all_levels), so the result is the same
+# (lightest colour = 0, full legend) on any machine.
+plot_area_map <- function(r, pal) {
+  rng <- unlist(terra::global(r, "range", na.rm = TRUE))
+  if (all(is.finite(rng)) && rng[1] != rng[2]) {
+    plot(r, col = pal, breaks = scale_breaks, legend = "bottomright",
+         mar = c(1.5, 0.5, 4, 0.5), plg = list(title = "1000 ha", cex = 0.8))
+    return(invisible(NULL))
+  }
+  nb  <- length(scale_breaks) - 1
+  v   <- if (is.finite(rng[1])) min(max(rng[1], scale_breaks[1]), scale_breaks[nb + 1] - 1e-6) else 0
+  cls <- which(v >= scale_breaks[1:nb] & v < scale_breaks[2:(nb + 1)])[1]
+  rc  <- terra::classify(r * 0 + cls, cbind(cls - 0.5, cls + 0.5, cls), include.lowest = TRUE)
+  levels(rc) <- data.frame(id = 1:nb,
+                           label = paste(scale_breaks[1:nb], scale_breaks[2:(nb + 1)], sep = " - "))
+  plot(rc, col = pal, type = "classes", all_levels = TRUE, legend = "bottomright",
+       mar = c(1.5, 0.5, 4, 0.5), plg = list(title = "1000 ha", cex = 0.8))
+  invisible(NULL)
+}
+
 # =============================================================================
 # 3.  Map generation (one scenario at a time)
 # =============================================================================
@@ -327,12 +352,7 @@ run_scenario <- function(sc) {
       r         <- to_raster(df_yr)
 
       png(out_file, width = 820, height = 780, res = 100)
-      plot(r,
-           col    = pal,
-           breaks = scale_breaks,
-           legend = "bottomright",
-           mar    = c(1.5, 0.5, 4, 0.5),
-           plg    = list(title = "1000 ha", cex = 0.8))
+      plot_area_map(r, pal)
       title(main = sprintf("%s\n%s | %d | Total: %.2f Mha", sc$label, cls, yr, total_mha),
             adj = 1, cex.main = 0.9)
       terra::plot(brazil_states, border = "lightgray", lwd = 0.1, add = TRUE)
@@ -362,12 +382,7 @@ run_scenario <- function(sc) {
       r         <- to_raster(df_yr)
 
       png(out_file, width = 820, height = 780, res = 100)
-      plot(r,
-           col    = pal,
-           breaks = scale_breaks,
-           legend = "bottomright",
-           mar    = c(1.5, 0.5, 4, 0.5),
-           plg    = list(title = "1000 ha", cex = 0.8))
+      plot_area_map(r, pal)
       title(main = sprintf("%s\nLoss of %s | %d | Total: %.2f Mha", sc$label, cls, yr, total_mha),
             adj = 1, cex.main = 0.9)
       terra::plot(brazil_states, border = "lightgray", lwd = 0.1, add = TRUE)
@@ -396,12 +411,7 @@ run_scenario <- function(sc) {
       r         <- to_raster(df_yr)
 
       png(out_file, width = 820, height = 780, res = 100)
-      plot(r,
-           col    = tr$pal,
-           breaks = scale_breaks,
-           legend = "bottomright",
-           mar    = c(1.5, 0.5, 4, 0.5),
-           plg    = list(title = "1000 ha", cex = 0.8))
+      plot_area_map(r, tr$pal)
       title(main = sprintf("%s\n%s -> %s | %d | Total: %.2f Mha", sc$label, tr$from, tr$to, yr, total_mha),
             adj = 1, cex.main = 0.9)
       terra::plot(brazil_states, border = "lightgray", lwd = 0.1, add = TRUE)
