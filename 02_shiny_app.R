@@ -186,7 +186,9 @@ landuse_map <- list(
                       hist_type = "Cropland",                hist_source = "IBGE",
                       y_label   = "Area (Mha)"),
   "Pasture"    = list(fable_col = "CalcPasture",   fable_unit = "1000 ha",
-                      hist_type = "Pastures and Rangelands", hist_source = "LAPIG",
+                      # "MapBiomasIBGE approach" replaced LAPIG as the default Pasture line
+                      # (the LAPIG rows are still in histdatabrazil.csv, just not plotted)
+                      hist_type = "Pastures and Rangelands", hist_source = "MapBiomasIBGE approach",
                       y_label   = "Area (Mha)"),
   "Forest"     = list(fable_col = "CalcForest",    fable_unit = "1000 ha",
                       hist_type = "Forest",                  hist_source = "Mapbiomas",

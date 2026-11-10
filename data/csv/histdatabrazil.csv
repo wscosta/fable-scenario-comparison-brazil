@@ -5,12 +5,17 @@ Pastures and Rangelands,LAPIG,2005,177.17,million ha
 Pastures and Rangelands,LAPIG,2010,179.22,million ha
 Pastures and Rangelands,LAPIG,2015,178.17,million ha
 Pastures and Rangelands,LAPIG,2020,177.24,million ha
+Pastures and Rangelands,MapBiomasIBGE approach,2000,154.7732824,million ha
+Pastures and Rangelands,MapBiomasIBGE approach,2005,159.103047,million ha
+Pastures and Rangelands,MapBiomasIBGE approach,2010,164.3434765,million ha
+Pastures and Rangelands,MapBiomasIBGE approach,2015,159.3104714,million ha
+Pastures and Rangelands,MapBiomasIBGE approach,2020,159.8245587,million ha
 Forest,Mapbiomas,1995,568.0288629,million ha
-Forest,Mapbiomas,2000,552.0090547,million ha
-Forest,Mapbiomas,2005,535.2429602,million ha
-Forest,Mapbiomas,2010,527.4954576,million ha
-Forest,Mapbiomas,2015,521.4796658,million ha
-Forest,Mapbiomas,2020,513.1801345,million ha
+Forest,Mapbiomas,2000,608.0054081,million ha
+Forest,Mapbiomas,2005,590.0961151,million ha
+Forest,Mapbiomas,2010,581.3208335,million ha
+Forest,Mapbiomas,2015,573.3111949,million ha
+Forest,Mapbiomas,2020,564.7667766,million ha
 Ruminant Meat,FAOSTAT,1995,5.8445,million tonnes
 Ruminant Meat,FAOSTAT,2000,6.6796,million tonnes
 Ruminant Meat,FAOSTAT,2005,8.6974,million tonnes
@@ -18,11 +23,11 @@ Ruminant Meat,FAOSTAT,2010,9.2263,million tonnes
 Ruminant Meat,FAOSTAT,2015,9.54650909,million tonnes
 Ruminant Meat,FAOSTAT,2020,10.11590392,million tonnes
 Other Land,Mapbiomas,1995,51.19588857,million ha
-Other Land,Mapbiomas,2000,51.6150562,million ha
-Other Land,Mapbiomas,2005,50.79746883,million ha
-Other Land,Mapbiomas,2010,49.93474128,million ha
-Other Land,Mapbiomas,2015,49.21532897,million ha
-Other Land,Mapbiomas,2020,48.65974572,million ha
+Other Land,Mapbiomas,2000,25.51016991,million ha
+Other Land,Mapbiomas,2005,26.09075413,million ha
+Other Land,Mapbiomas,2010,27.62107424,million ha
+Other Land,Mapbiomas,2015,28.77683106,million ha
+Other Land,Mapbiomas,2020,29.4270506,million ha
 Cropland,IBGE,1995,51.85,million ha
 Cropland,IBGE,2000,51.82,million ha
 Cropland,IBGE,2005,64.32,million ha
@@ -210,11 +215,11 @@ Temporary Crops,IBGE,2010,59.059599,million ha
 Temporary Crops,IBGE,2015,71.031304,million ha
 Temporary Crops,IBGE,2020,77.955937,million ha
 Urban,Mapbiomas,1995,2.4790635,million ha
-Urban,Mapbiomas,2000,2.835137505,million ha
-Urban,Mapbiomas,2005,3.096471437,million ha
-Urban,Mapbiomas,2010,3.359244846,million ha
-Urban,Mapbiomas,2015,3.690668126,million ha
-Urban,Mapbiomas,2020,3.974328791,million ha
+Urban,Mapbiomas,2000,2.98638625,million ha
+Urban,Mapbiomas,2005,3.253789217,million ha
+Urban,Mapbiomas,2010,3.531553079,million ha
+Urban,Mapbiomas,2015,3.914857385,million ha
+Urban,Mapbiomas,2020,4.286789161,million ha
 Secondary Forest,Mapbiomas,1995,13.919462,million ha
 Secondary Forest,Mapbiomas,2000,19.256821,million ha
 Secondary Forest,Mapbiomas,2005,24.477493,million ha

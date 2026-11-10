@@ -162,7 +162,7 @@ Maps of what has actually been **observed** in Brazil — not scenario results �
 
 | Topic | Source |
 |-------|--------|
-| Land use | MapBiomas, LAPIG, IBGE |
+| Land use | MapBiomas and IBGE (Pasture uses the "MapBiomasIBGE approach"; LAPIG is kept in the data file but not plotted) |
 | Crop area and production | IBGE |
 | Livestock | IBGE |
 | Trade | Comex (observed) · MAPA (projections to 2035) |
