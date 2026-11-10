@@ -2,6 +2,8 @@
 
 An interactive app for exploring how Brazil's land use, agriculture and emissions could evolve up to 2050 under different scenarios — and how those scenarios compare with what has actually been observed since the 1990s.
 
+> **🎓 Workshop version (branch `oficina-nov26-sp`).** This branch is prepared for the November 2026 workshop in São Paulo. It shows only the two scenarios of the **UP52 calibration of the FABLE Calculator** — *Current Trends* and *NDC Commitments* — and the app deliberately labels them without the version number. Everything else is the same as `main`, which keeps all calibrations (UP46 to UP52); to see them, switch to `main`.
+
 ## 📋 What is this?
 
 The [FABLE Calculator](https://fableconsortium.org/tools/fablecalculators/) is a modelling tool developed by the FABLE Consortium to explore pathways toward sustainable food and land-use systems. This app takes the Calculator's results for Brazil and lets you compare several scenarios side by side, next to observed historical data — without opening a single spreadsheet.
