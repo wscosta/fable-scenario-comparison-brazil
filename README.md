@@ -12,8 +12,6 @@ Follow the four steps in order. You only need to do steps 1 to 3 once.
 
 The app runs on **R, version 4.1 or newer**. Download and install it **before anything else**, from the official site: **<https://cran.r-project.org/>** → click your system (*Download R for Windows / macOS / Linux*) and run the installer with the default options.
 
-([RStudio](https://posit.co/download/rstudio-desktop/) is optional — you do not need it.)
-
 ### Step 2 — Download the app
 
 1. Open the project page: **<https://github.com/wscosta/fable-scenario-comparison-brazil/tree/oficina-nov26-sp>**
