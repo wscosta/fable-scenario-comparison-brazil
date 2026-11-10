@@ -4,44 +4,6 @@ An interactive app for exploring how Brazil's land use, agriculture and emission
 
 > **🎓 Workshop version (branch `oficina-nov26-sp`).** This branch is prepared for the November 2026 workshop in São Paulo. It shows only the two scenarios of the **UP52 calibration of the FABLE Calculator** — *Current Trends* and *NDC Commitments* — and the app deliberately labels them without the version number. Everything else is the same as `main`, which keeps all calibrations (UP46 to UP52); to see them, switch to `main`.
 
-## 📋 What is this?
-
-The [FABLE Calculator](https://fableconsortium.org/tools/fablecalculators/) is a modelling tool developed by the FABLE Consortium to explore pathways toward sustainable food and land-use systems. This app takes the Calculator's results for Brazil and lets you compare several scenarios side by side, next to observed historical data — without opening a single spreadsheet.
-
-Everything is interactive: switch scenarios on and off, hover over a chart for exact values, change the time window, and download any table.
-
-### The scenarios
-
-There are two kinds of pathway:
-
-- **Current Trends** — business as usual: what happens if today's trends continue.
-- **NDC Commitments** — what happens if Brazil delivers on its climate commitments under the Paris Agreement (its *Nationally Determined Contribution*).
-
-Each pathway comes in several **calibrations** (UP46, UP48, UP50, UP51, UP51a, UP51b, UP52). A calibration is a version of the model's setup, refined over time — a higher number (and, within the same number, a later letter) means a more recent one. **UP52 is the newest.** UP51a was UP51 with an updated land-use baseline (MapBiomas Collection 10 and IBGE).
-
-| Calibration | Current Trends | NDC Commitments |
-|-------------|:--------------:|:---------------:|
-| UP52 | ✅ | ✅ |
-| UP51b | ✅ | ✅ |
-| UP51a | ✅ | ✅ |
-| UP51 | ✅ | ✅ |
-| UP50 | ✅ | ✅ |
-| UP48 | ✅ | ✅ |
-| UP46 | ✅ | — |
-
-When the app opens, only the newest calibration (UP52) is switched on; every other scenario is one click away.
-
-### Quick glossary
-
-| Term | Meaning |
-|------|---------|
-| **Calibration** | The period (2000–2020) in which the model is checked against observed data. After 2020 the lines are projections. |
-| **Mha** | Million hectares |
-| **Mt** | Million tonnes |
-| **MtCO₂e** | Million tonnes of CO₂ equivalent — all greenhouse gases expressed in one common unit |
-| **AFOLU** | Agriculture, Forestry and Other Land Use |
-| **NDC** | Nationally Determined Contribution — a country's climate commitment under the Paris Agreement |
-
 ## ⚙️ Requirements and installation
 
 The app runs on **R, version 4.1 or newer** (a free download from [r-project.org](https://www.r-project.org/); [RStudio](https://posit.co/download/rstudio-desktop/) is optional but handy). On top of R you need a few add-on packages, installed once:
@@ -66,6 +28,38 @@ remotes::install_github("mattflor/chorddiag")
 ```
 
 The launchers below do not install packages for you, so do this step first.
+
+## 📋 What is this?
+
+The [FABLE Calculator](https://fableconsortium.org/tools/fablecalculators/) is a modelling tool developed by the FABLE Consortium to explore pathways toward sustainable food and land-use systems. This app takes the Calculator's results for Brazil and lets you compare several scenarios side by side, next to observed historical data — without opening a single spreadsheet.
+
+Everything is interactive: switch scenarios on and off, hover over a chart for exact values, change the time window, and download any table.
+
+### The scenarios
+
+There are two kinds of pathway:
+
+- **Current Trends** — business as usual: what happens if today's trends continue.
+- **NDC Commitments** — what happens if Brazil delivers on its climate commitments under the Paris Agreement (its *Nationally Determined Contribution*).
+
+Each pathway comes in **calibrations**: a calibration is a version of the model's setup, refined over time. This workshop version uses the newest one, **UP52**.
+
+| Calibration | Current Trends | NDC Commitments |
+|-------------|:--------------:|:---------------:|
+| UP52 | ✅ | ✅ |
+
+When the app opens, both scenarios are switched on.
+
+### Quick glossary
+
+| Term | Meaning |
+|------|---------|
+| **Calibration** | The period (2000–2020) in which the model is checked against observed data. After 2020 the lines are projections. |
+| **Mha** | Million hectares |
+| **Mt** | Million tonnes |
+| **MtCO₂e** | Million tonnes of CO₂ equivalent — all greenhouse gases expressed in one common unit |
+| **AFOLU** | Agriculture, Forestry and Other Land Use |
+| **NDC** | Nationally Determined Contribution — a country's climate commitment under the Paris Agreement |
 
 ## ▶️ Opening the app
 
@@ -143,10 +137,10 @@ One grid is shown per selected scenario, and **all grids use the same colour sca
 
 ### 🌎 Maps
 
-Maps of **where** land-use change happens across Brazil, for the scenarios that have been spatially downscaled (currently UP52, UP51b, UP51a, UP50, UP48 and UP46 — UP48 and UP46 for Current Trends only). The newest calibration with both pathways (UP52) is shown when the tab opens.
+Maps of **where** land-use change happens across Brazil, for the scenarios that have been spatially downscaled (both scenarios in this workshop version). Both maps are shown when the tab opens.
 
 - **Map Type** — *Land Cover* (area of a class in each year), *Outflows* (area lost by a class) or *Transitions* (area converted from one class to another).
-- **New Forest** — a Land Cover class of its own: land afforested under the NDC pathway (12 Mha by 2030, drawn in the same green and on the same scale as Forest, so each cell holds little and the map looks pale). It shows as empty on Current Trends, and it is "not available" for the older UP50, UP48 and UP46 data, whose downscaling did not track it. There is no Outflows map for it, since afforested land is not converted back.
+- **New Forest** — a Land Cover class of its own: land afforested under the NDC pathway (12 Mha by 2030, drawn in the same green and on the same scale as Forest, so each cell holds little and the map looks pale). It shows as empty on Current Trends. There is no Outflows map for it, since afforested land is not converted back.
 - **Scenario** — choose up to two. When both belong to the same calibration, a third map shows the **difference** between them (blue = the second scenario has more, red = less).
 - **Year** — 2020 to 2050, using the `◀` `▶` buttons or the year bar.
 
