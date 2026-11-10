@@ -2,32 +2,54 @@
 
 An interactive app for exploring how Brazil's land use, agriculture and emissions could evolve up to 2050 under different scenarios — and how those scenarios compare with what has actually been observed since the 1990s.
 
-> **🎓 Workshop version (branch `oficina-nov26-sp`).** This branch is prepared for the November 2026 workshop in São Paulo. It shows only the two scenarios of the **UP52 calibration of the FABLE Calculator** — *Current Trends* and *NDC Commitments* — and the app deliberately labels them without the version number. Everything else is the same as `main`, which keeps all calibrations (UP46 to UP52); to see them, switch to `main`.
+> **🎓 Workshop version (branch `oficina-nov26-sp`).** This branch is prepared for the November 2026 workshop in São Paulo. It shows only the two scenarios of the **UP52 calibration of the FABLE Calculator** — *Current Trends* and *NDC Commitments*.
 
-## ⚙️ Requirements and installation
+## ⚙️ Installation — step by step
 
-The app runs on **R, version 4.1 or newer** (a free download from [r-project.org](https://www.r-project.org/); [RStudio](https://posit.co/download/rstudio-desktop/) is optional but handy). On top of R you need a few add-on packages, installed once:
+Follow the four steps in order. You only need to do steps 1 to 3 once.
 
-| Package | What it is used for |
-|---------|---------------------|
-| `shiny` | The web app itself |
-| `bslib` | The app's look and feel |
-| `plotly` | Interactive charts |
-| `chorddiag` | The Chord diagram on the Land Use Change tab |
-| `readxl` | Reading the FABLE Calculator Excel files |
-| `dplyr`, `tidyr` | Preparing the data |
-| `terra`, `RColorBrewer` | Building the Maps tab's maps |
-| `ggplot2`, `officer`, `flextable` | Only for the optional Word report |
+### Step 1 — Install R first
 
-Paste this into the R console (the last line installs `chorddiag`, which is only available from GitHub):
+The app runs on **R, version 4.1 or newer**. Download and install it **before anything else**, from the official site: **<https://cran.r-project.org/>** → click your system (*Download R for Windows / macOS / Linux*) and run the installer with the default options.
+
+([RStudio](https://posit.co/download/rstudio-desktop/) is optional — you do not need it.)
+
+### Step 2 — Download the app
+
+1. Open the project page: **<https://github.com/wscosta/fable-scenario-comparison-brazil/tree/oficina-nov26-sp>**
+2. Click the green **`< > Code`** button and then **Download ZIP**.
+   Or download the zip directly: **<https://github.com/wscosta/fable-scenario-comparison-brazil/archive/refs/heads/oficina-nov26-sp.zip>**
+3. Extract the zip (Windows: right-click the file → **Extract All…**; macOS: double-click it). Always extract it — do not run the app from inside the zip. You get a folder called `fable-scenario-comparison-brazil-oficina-nov26-sp`.
+
+*(If you use Git, you can instead run `git clone -b oficina-nov26-sp https://github.com/wscosta/fable-scenario-comparison-brazil.git`.)*
+
+### Step 3 — Install the R packages
+
+1. Open **R** (Windows: Start menu → *R*; macOS: Applications → *R*; Linux: type `R` in a terminal). A window called the *R console* opens.
+2. Copy the code below, paste it into the console and press **Enter**. It downloads the packages and takes a few minutes; if R asks you to choose a mirror or whether to use a personal library, accept the default.
 
 ```r
 install.packages(c("readxl", "dplyr", "tidyr", "shiny", "plotly", "bslib",
-                   "terra", "RColorBrewer", "ggplot2", "officer", "flextable"))
+                   "terra", "RColorBrewer", "remotes"))
 remotes::install_github("mattflor/chorddiag")
 ```
 
-The launchers below do not install packages for you, so do this step first.
+The last line installs `chorddiag`, which is only available from GitHub. This step needs an internet connection — do it **before** the workshop, not during it.
+
+| Package | What it is used for |
+|---------|---------------------|
+| `shiny`, `bslib` | The web app and its look and feel |
+| `plotly`, `chorddiag` | Interactive charts and the Chord diagram |
+| `readxl`, `dplyr`, `tidyr` | Reading and preparing the FABLE Calculator data |
+| `terra`, `RColorBrewer` | The Maps tab |
+| `remotes` | Installing `chorddiag` from GitHub |
+
+### Step 4 — Open the app
+
+Open the extracted folder and double-click the file for your system (details in *Opening the app* below): `open_app_windows.bat` on Windows, `open_app_mac.command` on macOS, `open_app_ubuntu.sh` on Ubuntu. The app opens in your web browser. The first launch prepares the data and can take a few minutes.
+
+> The launchers do **not** install R or the packages for you — that is why steps 1 and 3 come first.
+
 
 ## 📋 What is this?
 
